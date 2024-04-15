@@ -1,0 +1,14 @@
+{
+  "name": "um552",
+  "version": "1.0.0",
+  "description": "UM552",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "gps-tracking": "^1.1.1"
+  }
+}
