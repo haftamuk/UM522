@@ -7,10 +7,10 @@ var options = {
 };
 
 var server = gps.server(options, function (device, connection) {
-  device.on("connected", function (data) {
+  device.on("connected", function () {
     console.log("I'm a new device CONNECTED");
   });
-  device.on("disconnected", function (data) {
+  device.on("disconnected", function () {
     console.log("I'm a new device DISCONNECTED");
   });
 
