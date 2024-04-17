@@ -11,14 +11,11 @@ var server = gps.server(options, function (device, connection) {
     console.log("I'm a new device CONNECTED");
   });
   device.on("disconnected", function () {
-    console.log("I'm a new device DISCONNECTED");
+    console.log("Device DISCONNECTED");
   });
 
   device.on("login_request", function (device_id, msg_parts) {
-    console.log(
-      "Hey! I want to start transmiting my position. Please accept me. My name is " +
-        device_id
-    );
+    console.log("LOGIN_REQUEST EMITTED. My name is " + device_id);
 
     this.login_authorized(true);
 
