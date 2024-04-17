@@ -22,9 +22,10 @@ var server = gps.server(options, function (device, connection) {
     this.login_authorized(true);
 
     console.log("Ok, " + device_id + ", you're accepted!");
+    console.log("LOGIN REQUEST CONTENT : ", msg_parts.toString());
   });
 
-  device.on("ping", function (data) {
+  device.on("ping", function (data, msg_parts) {
     //this = device
     console.log(
       "I'm here: " +
@@ -37,7 +38,7 @@ var server = gps.server(options, function (device, connection) {
     );
 
     //Look what informations the device sends to you (maybe velocity, gas level, etc)
-    //console.log(data);
+    console.log("HERE IS GPS Tracker data sent:", data);
     return data;
   });
 
@@ -50,6 +51,6 @@ var server = gps.server(options, function (device, connection) {
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     //echo raw data package
-    console.log(data.toString());
+    console.log("RAW DATA PACKAGE ECHO : ", data.toString());
   });
 });

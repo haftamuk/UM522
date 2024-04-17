@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "crc": "^4.3.2",
     "gps-tracking": "^1.1.1"
   }
 }
