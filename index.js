@@ -22,7 +22,7 @@ var server = gps.server(options, function (device, connection) {
     this.login_authorized(true);
 
     console.log("Ok, " + device_id + ", you're accepted!");
-    console.log("LOGIN REQUEST CONTENT : ", msg_parts.toString());
+    console.log("LOGIN REQUEST CONTENT : ", JSON.stringify(msg_parts);
   });
 
   device.on("ping", function (data, msg_parts) {
