@@ -26,6 +26,24 @@ var server = gps.server(options, function (device, connection) {
   device.on("ping", function (data, msg_parts) {
     console.log("PING REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_parts));
     console.log("PING REQUEST CONTENT DATA: ", JSON.stringify(data));
+    /**
+     * #######################################################################
+     * ########## SENDING LOCATION INFORMATION TO SERVER ######################
+     * #######################################################################
+     */
+    fetch(`http://78.47.144.132:3000/api/GPSLocationFeed`, {
+      method: "POST",
+      mode: "cors",
+      body: JSON.stringify({ data: data }),
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => console.log("MooveLocation Returned Data", data));
+    /**
+     * #######################################################################
+     */
 
     //this = device
     // console.log(
@@ -49,6 +67,25 @@ var server = gps.server(options, function (device, connection) {
     console.log(
       "Help! Something happend: " + alarm_code + " (" + alarm_data.msg + ")"
     );
+
+    /**
+     * #######################################################################
+     * ##########SENDING ALARM AND LOCATION INFORMATION TO SERVER ############
+     * #######################################################################
+     */
+    fetch(`http://78.47.144.132:3000/api/GPSLocationFeed`, {
+      method: "POST",
+      mode: "cors",
+      body: JSON.stringify({ data: alarm_data }),
+      headers: {
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => console.log("MooveLocation Returned Data", data));
+    /**
+     * #######################################################################
+     */
   });
 
   //Also, you can listen on the native connection object
