@@ -1,3 +1,6 @@
+const token = 'j8AqyzxzWToPcBudDE2xABrd';
+const pino = require('pino');
+
 var gps = require("gps-tracking");
 
 var options = {
@@ -6,26 +9,37 @@ var options = {
   device_adapter: "GT06",
 };
 
+
+const transport = pino.transport({
+  target: "@logtail/pino",
+  options: { sourceToken: token }
+});
+const logger = pino(transport);
+
+
+
 var server = gps.server(options, function (device, connection) {
   device.on("connected", function () {
-    console.log("I'm a new device CONNECTED");
+    //    logger.info("I'm a new device CONNECTED");
+    logger.info('I am a new device CONNECTED');
   });
   device.on("disconnected", function () {
-    console.log("Device DISCONNECTED");
+    logger.info("Device DISCONNECTED");
+
   });
 
   device.on("login_request", function (device_id, msg_parts) {
-    console.log("LOGIN_REQUEST EMITTED. My name is " + device_id);
+    logger.info("LOGIN_REQUEST EMITTED. My name is " + device_id);
 
     this.login_authorized(true);
 
-    console.log("Ok, " + device_id + ", you're accepted!");
-    console.log("LOGIN REQUEST CONTENT : ", JSON.stringify(msg_parts));
+    logger.info("Ok, " + device_id + ", you're accepted!");
+    logger.info("LOGIN REQUEST CONTENT : ", JSON.stringify(msg_parts));
   });
 
   device.on("ping", function (data, msg_parts) {
-    console.log("PING REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_parts));
-    console.log("PING REQUEST CONTENT DATA: ", JSON.stringify(data));
+    logger.info("PING REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_parts));
+    logger.info("PING REQUEST CONTENT DATA: ", JSON.stringify(data));
     /**
      * #######################################################################
      * ########## SENDING LOCATION INFORMATION TO SERVER ######################
@@ -40,13 +54,13 @@ var server = gps.server(options, function (device, connection) {
       },
     })
       .then((response) => response.json())
-      .then((data) => console.log("MooveLocation Returned Data", data));
+      .then((data) => logger.info("MooveLocation Returned Data", data));
     /**
      * #######################################################################
      */
 
     //this = device
-    // console.log(
+    // logger.info(
     //   "I'm here: " +
     //     data.latitude +
     //     ", " +
@@ -57,14 +71,14 @@ var server = gps.server(options, function (device, connection) {
     // );
 
     //Look what informations the device sends to you (maybe velocity, gas level, etc)
-    //    console.log("HERE IS GPS Tracker data sent:", JSON.stringify(data));
+    //    logger.info("HERE IS GPS Tracker data sent:", JSON.stringify(data));
     return data;
   });
 
   device.on("alarm", function (alarm_code, alarm_data, msg_data) {
-    console.log("ALARM REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_data));
+    logger.info("ALARM REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_data));
 
-    console.log(
+    logger.info(
       "Help! Something happend: " + alarm_code + " (" + alarm_data.msg + ")"
     );
 
@@ -82,7 +96,7 @@ var server = gps.server(options, function (device, connection) {
       },
     })
       .then((response) => response.json())
-      .then((data) => console.log("MooveLocation Returned Data", data));
+      .then((data) => logger.info("MooveLocation Returned Data", data));
     /**
      * #######################################################################
      */
@@ -91,6 +105,6 @@ var server = gps.server(options, function (device, connection) {
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     //echo raw data package
-    console.log("RAW DATA emitted : ", data);
+    logger.info("RAW DATA emitted : ", data);
   });
 });

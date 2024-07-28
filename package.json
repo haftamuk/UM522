@@ -9,7 +9,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@logtail/pino": "^0.4.22",
     "crc": "^4.3.2",
-    "gps-tracking": "^1.1.1"
+    "gps-tracking": "^1.1.1",
+    "pino": "^9.3.2"
   }
 }
