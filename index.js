@@ -34,12 +34,17 @@ var server = gps.server(options, function (device, connection) {
     this.login_authorized(true);
 
     logger.info("Ok, " + device_id + ", you're accepted!");
-    logger.info("LOGIN REQUEST CONTENT : ", JSON.stringify(msg_parts));
+    logger.info("LOGIN REQUEST CONTENT : ");
+    logger.info(JSON.stringify(msg_parts));
+
   });
 
   device.on("ping", function (data, msg_parts) {
-    logger.info("PING REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_parts));
-    logger.info("PING REQUEST CONTENT DATA: ", JSON.stringify(data));
+    logger.info("PING REQUEST CONTENT MSG_PARTS: ");
+    logger.info(JSON.stringify(msg_parts));
+
+    logger.info("PING REQUEST CONTENT DATA: ");
+    logger.info(JSON.stringify(data));
     /**
      * #######################################################################
      * ########## SENDING LOCATION INFORMATION TO SERVER ######################
@@ -54,7 +59,7 @@ var server = gps.server(options, function (device, connection) {
       },
     })
       .then((response) => response.json())
-      .then((data) => logger.info("MooveLocation Returned Data", data));
+      .then((data) => logger.info("MooveLocation Returned Data" + data));
     /**
      * #######################################################################
      */
@@ -76,7 +81,8 @@ var server = gps.server(options, function (device, connection) {
   });
 
   device.on("alarm", function (alarm_code, alarm_data, msg_data) {
-    logger.info("ALARM REQUEST CONTENT MSG_PARTS: ", JSON.stringify(msg_data));
+    logger.info("ALARM REQUEST CONTENT MSG_PARTS: ");
+    logger.info(JSON.stringify(msg_data));
 
     logger.info(
       "Help! Something happend: " + alarm_code + " (" + alarm_data.msg + ")"
@@ -96,7 +102,11 @@ var server = gps.server(options, function (device, connection) {
       },
     })
       .then((response) => response.json())
-      .then((data) => logger.info("MooveLocation Returned Data", data));
+      .then((data) => {
+        logger.info("MooveLocation Returned Data : ");
+        logger.info(data);
+      }
+      );
     /**
      * #######################################################################
      */
@@ -105,6 +115,7 @@ var server = gps.server(options, function (device, connection) {
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     //echo raw data package
-    logger.info("RAW DATA emitted : ", data);
+    logger.info("RAW DATA emitted : ");
+    logger.info(data);
   });
 });
