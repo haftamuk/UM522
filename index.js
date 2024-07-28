@@ -1,5 +1,6 @@
 const token = 'j8AqyzxzWToPcBudDE2xABrd';
 const pino = require('pino');
+const net = require("net");
 
 var gps = require("gps-tracking");
 
@@ -154,6 +155,24 @@ var server = gps.server(options, function (device, connection) {
     if (is_proxy_CRS_device) {
       //echo raw data package
       logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+      let proxyToCRSSocket = net.createConnection(
+        {
+          host: "ch1181857.flespi.gw",
+          port: "24918",
+        },
+        () => {
+          console.log("Connected to CRS server");
+          logger.info("connected to CRS server");
+
+        }
+
+      );
+      proxyToCRSSocket.write(data);
+      proxyToCRSSocket.on("error", (err) => {
+        logger.info("Error Connecting : " + err.message);
+      });
+
+
     } else {
       //echo raw data package
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
