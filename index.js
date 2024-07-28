@@ -14,6 +14,11 @@ const transport = pino.transport({
   target: "@logtail/pino",
   options: { sourceToken: token }
 });
+
+// Plates: Land cruiser(74740), 62940, 77437, 3-B77827, A65331, 3-16636 B77849
+const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174", "0868720061898619", "0358657104517136", "0358657103861956", "0358657104813964"]
+
+
 const logger = pino(transport);
 
 
@@ -120,6 +125,7 @@ var server = gps.server(options, function (device, connection) {
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
+
     let bufferToHexString = function (buffer) {
       var str = '';
       for (var i = 0; i < buffer.length; i++) {
@@ -134,8 +140,23 @@ var server = gps.server(options, function (device, connection) {
       return str;
     };
 
-    //echo raw data package
-    logger.info("RAW DATA emitted : ");
-    logger.info(bufferToHexString(data));
+
+    function isProxyCRSDevice(value) {
+      for (var i = 0; i < crsTerminals.length; i++) {
+        if (value.indexOf(crsTerminals[i]) > -1) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
+    if (is_proxy_CRS_device) {
+      //echo raw data package
+      logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+    } else {
+      //echo raw data package
+      logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+    }
   });
 });
