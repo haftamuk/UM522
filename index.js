@@ -59,7 +59,7 @@ var server = gps.server(options, function (device, connection) {
       },
     })
       .then((response) => response.json())
-      .then((data) => logger.info("MooveLocation Returned Data" + data));
+      .then((data) => logger.info("MooveLocation Returned Data"));
     /**
      * #######################################################################
      */
@@ -112,10 +112,30 @@ var server = gps.server(options, function (device, connection) {
      */
   });
 
+
+
+
+
+
+
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
+    let bufferToHexString = function (buffer) {
+      var str = '';
+      for (var i = 0; i < buffer.length; i++) {
+        if (buffer[i] < 16) {
+          str += '0';
+        }
+        str += buffer[i].toString(16);
+      }
+
+
+      console.log("bufferToHexString : ", str)
+      return str;
+    };
+
     //echo raw data package
     logger.info("RAW DATA emitted : ");
-    logger.info(data);
+    logger.info(bufferToHexString(data));
   });
 });
