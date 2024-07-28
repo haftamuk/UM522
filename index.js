@@ -16,7 +16,7 @@ const transport = pino.transport({
   options: { sourceToken: token }
 });
 
-// Plates: Land cruiser(74740), 62940, 77437, 3-B77827, A65331, 3-16636 B77849
+// Plates: Land cruiser(74740) / UM552, 62940 / um552, 77437 / UM552, 3-B77827 / UM552, A65331/ TK003, 3-16636/ TK003,  B77849 / TK003
 const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174", "0868720061898619", "0358657104517136", "0358657103861956", "0358657104813964"]
 
 
@@ -109,8 +109,8 @@ var server = gps.server(options, function (device, connection) {
     })
       .then((response) => response.json())
       .then((data) => {
-        logger.info("MooveLocation Returned Data : ");
-        logger.info(data);
+        logger.info("MooveLocation Returned Result.");
+        // logger.info(data);
       }
       );
     /**
@@ -161,18 +161,15 @@ var server = gps.server(options, function (device, connection) {
           port: "24918",
         },
         () => {
-          console.log("Connected to CRS server");
           logger.info("connected to CRS server");
-
         }
-
       );
-      proxyToCRSSocket.write(data);
+      proxyToCRSSocket.write(data, () => {
+        logger.info("Data Written to CRS server");
+      });
       proxyToCRSSocket.on("error", (err) => {
         logger.info("Error Connecting : " + err.message);
       });
-
-
     } else {
       //echo raw data package
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
