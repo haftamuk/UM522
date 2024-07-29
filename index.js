@@ -171,11 +171,11 @@ var server = gps.server(options, function (device, connection) {
       //   logger.info("Error Connecting : " + err.message);
       // });
 
-      var client = new net.Socket();
+      let client = new net.Socket();
       client.connect(20859, '193.193.165.165', function () {
         console.log('Connected');  // acknowledge socket connection
         client.write(data); // send info to Server
-        logger.info("Data Written to CRS server" + data.toString());
+        logger.info("Data Written to CRS server : " + bufferToHexString(data));
       });
 
       let body = Buffer.from('');
@@ -188,14 +188,13 @@ var server = gps.server(options, function (device, connection) {
 
       client.on('end', function () {
         let data = JSON.parse({ responseData: body.toString() });
-        logger.info(data);
-        logger.info("All Data received from CRS server");
-        logger.info("Data type" + typeof data);
-
+        logger.info(bufferToHexString(data));
+        logger.info("CRS: - All Data received from CRS server");
+        logger.info("CRS - Destory Connection");
         client.destroy(); // kill client after server's response
       })
       client.on('close', function () {
-        logger.info("CRS Connection closed");
+        logger.info("CRS - Connection closed");
         console.log('Connection closed');
       });
 
