@@ -21,15 +21,33 @@ const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174"
 const logger = pino(transport);
 
 
+// #######################################################################################################################
+// ################################################# CRS ONLY ############################################################
+// #######################################################################################################################
+const client = new net.Socket();
+client.on("error", (err) => {
+  logger.info("CRS - Error Connecting : " + err.message);
+});
+
+
 
 var server = gps.server(options, function (device, connection) {
+  try {
+    client.connect(20859, '193.193.165.165', function () {
+      console.log('CRS- Connected ');  // acknowledge socket connection
+      logger.info("CRS - CONNECTED.");
+    });
+  } catch (error) {
+    logger.info("CRS - ERROR : " + error.message);
+  }
+
   device.on("connected", function () {
     //    logger.info("I'm a new device CONNECTED");
     logger.info('I am a new device CONNECTED');
   });
   device.on("disconnected", function () {
     logger.info("Device DISCONNECTED");
-
+    client.destroy(); // kill client after server's response 
   });
 
   device.on("login_request", function (device_id, msg_parts) {
@@ -120,23 +138,6 @@ var server = gps.server(options, function (device, connection) {
 
 
 
-  // #######################################################################################################################
-  // ################################################# CRS ONLY ############################################################
-  // #######################################################################################################################
-  var client = new net.Socket();
-
-  try {
-    client.connect(20859, '193.193.165.165', function () {
-      console.log('CRS- Connected ');  // acknowledge socket connection
-      logger.info("CRS - CONNECTED.");
-    });
-  } catch (error) {
-    logger.info("CRS - ERROR : " + error.message);
-  }
-
-  client.on("error", (err) => {
-    logger.info("CRS - Error Connecting : " + err.message);
-  });
 
 
 
@@ -163,11 +164,6 @@ var server = gps.server(options, function (device, connection) {
     return false;
   }
 
-  // connection.on("close", function () {
-  //   logger.info("CRS - Connection closed. ");
-  //   client.destroy(); // kill client after server's response 
-  // })
-
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     // logger.info("Connection Obj: " + Object.toString(connection));
@@ -178,39 +174,10 @@ var server = gps.server(options, function (device, connection) {
       client.write(data, () => {
         logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
       });
-
-      // let body = Buffer.from('');
-      // client.on('data', function (chunk) {
-      //   client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
-      //   try {
-      //     if (chunk && chunk.byteLength > 0) {
-      //       body = Buffer.concat([body, chunk]);
-      //     }
-      //     logger.info("CRS ON DATA - Collecting CRS server response data : " + bufferToHexString(body));
-
-      //   } catch (error) {
-      //     logger.info("CRS ON DATA - ERROR : " + error.message);
-      //   }
-      // });
-
-      // client.on('end', function () {
-      //   try {
-      //     logger.info("CRS ON END: - All Data received from CRS server : " + bufferToHexString(body) + " FROM : " + bufferToHexString(data));
-      //     logger.info("CRS ON END- Destroy Connection " + bufferToHexString(data));
-      //     client.destroy(); // kill client after server's response 
-      //   } catch (error) {
-      //     logger.info("CRS - ERROR ON END: " + error.message + " : " + bufferToHexString(data));
-      //   }
-      // })
-
-      // client.on('close', function () {
-      //   logger.info("CRS ON CLOSE - Connection closed " + bufferToHexString(data));
-      //   console.log('CRS Connection closed ' + bufferToHexString(data));
-      // });
-
     } else {
       //echo raw data package
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
     }
   });
 });
+
