@@ -197,8 +197,7 @@ var server = gps.server(options, function (device, connection) {
 
       client.on('end', function () {
         try {
-          logger.info(bufferToHexString(body));
-          logger.info("CRS: - All Data received from CRS server");
+          logger.info("CRS: - All Data received from CRS server : " + bufferToHexString(body));
           logger.info("CRS - Destroy Connection");
           client.destroy(); // kill client after server's response 
         } catch (error) {
