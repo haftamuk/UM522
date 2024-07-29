@@ -190,6 +190,8 @@ var server = gps.server(options, function (device, connection) {
         let data = JSON.parse({ responseData: body.toString() });
         logger.info(data);
         logger.info("All Data received from CRS server");
+        logger.info("Data type" + typeof data);
+
         client.destroy(); // kill client after server's response
       })
       client.on('close', function () {
