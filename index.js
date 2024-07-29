@@ -125,7 +125,7 @@ var server = gps.server(options, function (device, connection) {
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
-    logger.info("Connection Obj: " + connection.toString());
+    logger.info("Connection Obj: " + JSON.stringify(connection));
 
     let bufferToHexString = function (buffer) {
       var str = '';
