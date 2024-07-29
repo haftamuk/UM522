@@ -183,12 +183,13 @@ var server = gps.server(options, function (device, connection) {
       }
       let body = Buffer.from('');
       client.on('data', function (chunk) {
-        client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
         try {
           if (chunk && chunk.byteLength > 0) {
             body = Buffer.concat([body, chunk]);
           }
           logger.info("CRS ON DATA - Collecting CRS server response data : " + bufferToHexString(body));
+
+          client.write(data) ? logger.info("CRS ON DATA - WRITE SUCCESSFUL : " + bufferToHexString(data)) : logger.info("CRS - WRITE NOT SUCCESSFUL : " + bufferToHexString(data)); // send info to Server
 
         } catch (error) {
           logger.info("CRS ON DATA - ERROR : " + error.message);
