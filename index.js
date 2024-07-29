@@ -34,23 +34,13 @@ client.on("error", (err) => {
 var server = gps.server(options, function (device, connection) {
 
   device.on("connected", function () {
-    try {
-      client.connect(20859, '193.193.165.165', function () {
-        console.log('CRS- Connected ');  // acknowledge socket connection
-        logger.info("CRS - CONNECTED.");
-      });
-      console.log('DEVICE Connected ');  // acknowledge socket connection
-
-    } catch (error) {
-      logger.info("CRS - ERROR : " + error.message);
-    }
-    logger.info('I am a new device CONNECTED');
+    console.log('DEVICE Connected ');  // acknowledge socket connection
+    logger.info('CRS - I am a new device CONNECTED');
   });
 
   device.on("disconnected", function () {
     logger.info("CRS - Device DISCONNECTED");
     console.log('DEVICE DISConnected ');  // acknowledge socket connection
-    client.destroy(); // kill client after server's response 
   });
 
   device.on("login_request", function (device_id, msg_parts) {
@@ -175,7 +165,7 @@ var server = gps.server(options, function (device, connection) {
         console.log('CRS- Connected ');  // acknowledge socket connection
         logger.info("CRS - CONNECTED.");
       });
-      console.log('DEVICE Connected ');  // acknowledge socket connection
+      console.log('CRS - DEVICE Connected ');  // acknowledge socket connection
 
     } catch (error) {
       logger.info("CRS - ERROR : " + error.message);
