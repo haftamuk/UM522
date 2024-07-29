@@ -175,15 +175,23 @@ var server = gps.server(options, function (device, connection) {
       client.connect(20859, '193.193.165.165', function () {
         console.log('Connected');  // acknowledge socket connection
         client.write(data); // send info to Server
-        logger.info("Data Written to CRS server");
+        logger.info("Data Written to CRS server" + data.toString());
       });
 
+      let body = Buffer.from('');
       client.on('data', function (data) {
-        console.log('Received: ' + data); // display info received from server
-        logger.info("Data received from CRS server" + data.toString());
-        client.destroy(); // kill client after server's response
+        if (chunk && chunk.byteLength > 0) {
+          body = Buffer.concat([body, chunk]);
+        }
+        logger.info("Collecting CRS server response data");
       });
 
+      client.on('end', function () {
+        let data = JSON.parse({ responseData: body.toString() });
+        logger.info(data);
+        logger.info("All Data received from CRS server");
+        client.destroy(); // kill client after server's response
+      })
       client.on('close', function () {
         logger.info("CRS Connection closed");
         console.log('Connection closed');
