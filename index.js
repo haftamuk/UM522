@@ -153,23 +153,42 @@ var server = gps.server(options, function (device, connection) {
 
     let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
     if (is_proxy_CRS_device) {
-      //echo raw data package
-      logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
-      let proxyToCRSSocket = net.createConnection(
-        {
-          host: "193.193.165.165",
-          port: "20859",
-        },
-        () => {
-          logger.info("connected to CRS server");
-        }
-      );
-      proxyToCRSSocket.write(data, () => {
+      // //echo raw data package
+      // logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+      // let proxyToCRSSocket = net.createConnection(
+      //   {
+      //     host: "193.193.165.165",
+      //     port: "20859",
+      //   },
+      //   () => {
+      //     logger.info("connected to CRS server");
+      //   }
+      // );
+      // proxyToCRSSocket.write(data, () => {
+      //   logger.info("Data Written to CRS server");
+      // });
+      // proxyToCRSSocket.on("error", (err) => {
+      //   logger.info("Error Connecting : " + err.message);
+      // });
+
+      var client = new net.Socket();
+      client.connect(20859, '193.193.165.165', function () {
+        console.log('Connected');  // acknowledge socket connection
+        client.write(data); // send info to Server
         logger.info("Data Written to CRS server");
       });
-      proxyToCRSSocket.on("error", (err) => {
-        logger.info("Error Connecting : " + err.message);
+
+      client.on('data', function (data) {
+        console.log('Received: ' + data); // display info received from server
+        logger.info("Data received from CRS server" + data.toString());
+        client.destroy(); // kill client after server's response
       });
+
+      client.on('close', function () {
+        logger.info("CRS Connection closed");
+        console.log('Connection closed');
+      });
+
     } else {
       //echo raw data package
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
