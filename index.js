@@ -25,7 +25,20 @@ const logger = pino(transport);
 // ################################################# CRS ONLY ############################################################
 // #######################################################################################################################
 const client = new net.Socket();
+
+try {
+  client.connect(20859, '193.193.165.165', function () {
+    console.log('CRS- Connected ');  // acknowledge socket connection
+    logger.info("CRS - CONNECTED.");
+  });
+  console.log('CRS - DEVICE Connected ');  // acknowledge socket connection
+
+} catch (error) {
+  logger.info("CRS - ERROR : " + error.message);
+}
+
 client.on("error", (err) => {
+  console.log("CRS - Error Connecting : " + err.message);
   logger.info("CRS - Error Connecting : " + err.message);
 });
 
@@ -41,6 +54,8 @@ var server = gps.server(options, function (device, connection) {
   device.on("disconnected", function () {
     logger.info("CRS - Device DISCONNECTED");
     console.log('DEVICE DISConnected ');  // acknowledge socket connection
+    client.end(); // kill client after server's response 
+
   });
 
   device.on("login_request", function (device_id, msg_parts) {
@@ -158,25 +173,7 @@ var server = gps.server(options, function (device, connection) {
   }
 
 
-  //Also, you can listen on the native connection object
-  connection.on("connect", function () {
-    try {
-      client.connect(20859, '193.193.165.165', function () {
-        console.log('CRS- Connected ');  // acknowledge socket connection
-        logger.info("CRS - CONNECTED.");
-      });
-      console.log('CRS - DEVICE Connected ');  // acknowledge socket connection
 
-    } catch (error) {
-      logger.info("CRS - ERROR : " + error.message);
-    }
-  });
-
-  connection.on("end", function () {
-    logger.info("CRS - Device DISCONNECTED");
-    console.log('DEVICE DISConnected ');  // acknowledge socket connection
-    client.end(); // kill client after server's response 
-  });
 
 
 
