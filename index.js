@@ -179,7 +179,7 @@ var server = gps.server(options, function (device, connection) {
       });
 
       let body = Buffer.from('');
-      client.on('data', function (data) {
+      client.on('data', function (chunk) {
         if (chunk && chunk.byteLength > 0) {
           body = Buffer.concat([body, chunk]);
         }
@@ -187,10 +187,9 @@ var server = gps.server(options, function (device, connection) {
       });
 
       client.on('end', function () {
-        let data = JSON.parse({ responseData: body.toString() });
-        logger.info(bufferToHexString(data));
+        logger.info(bufferToHexString(body));
         logger.info("CRS: - All Data received from CRS server");
-        logger.info("CRS - Destory Connection");
+        logger.info("CRS - Destroy Connection");
         client.destroy(); // kill client after server's response
       })
       client.on('close', function () {
