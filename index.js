@@ -15,7 +15,6 @@ const transport = pino.transport({
   target: "@logtail/pino",
   options: { sourceToken: token }
 });
-
 // Plates: Land cruiser(74740) / UM552, 62940 / um552, 77437 / UM552, 3-B77827 / UM552, A65331/ TK003, 3-16636/ TK003,  B77849 / TK003
 const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174", "0868720061898619", "0358657104517136", "0358657103861956", "0358657104813964"]
 
@@ -124,7 +123,7 @@ var server = gps.server(options, function (device, connection) {
   // #######################################################################################################################
   // ################################################# CRS ONLY ############################################################
   // #######################################################################################################################
-  let client = new net.Socket();
+  var client = new net.Socket();
 
   try {
     client.connect(20859, '193.193.165.165', function () {
@@ -164,10 +163,10 @@ var server = gps.server(options, function (device, connection) {
     return false;
   }
 
-  connection.on("close", function () {
-    logger.info("CRS - Connection closed. ");
-    client.destroy(); // kill client after server's response 
-  })
+  // connection.on("close", function () {
+  //   logger.info("CRS - Connection closed. ");
+  //   client.destroy(); // kill client after server's response 
+  // })
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
