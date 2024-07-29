@@ -125,7 +125,7 @@ var server = gps.server(options, function (device, connection) {
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
-    logger.info("Connection Obj: " + Object.toString(connection));
+    // logger.info("Connection Obj: " + Object.toString(connection));
 
     let bufferToHexString = function (buffer) {
       var str = '';
@@ -176,7 +176,6 @@ var server = gps.server(options, function (device, connection) {
       try {
         client.connect(20859, '193.193.165.165', function () {
           console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
-          client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
           logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
         });
       } catch (error) {
@@ -184,6 +183,7 @@ var server = gps.server(options, function (device, connection) {
       }
       let body = Buffer.from('');
       client.on('data', function (chunk) {
+        client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
         try {
           if (chunk && chunk.byteLength > 0) {
             body = Buffer.concat([body, chunk]);
