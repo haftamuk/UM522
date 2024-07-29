@@ -121,95 +121,89 @@ var server = gps.server(options, function (device, connection) {
 
 
 
+  // #######################################################################################################################
+  // ################################################# CRS ONLY ############################################################
+  // #######################################################################################################################
+  let client = new net.Socket();
+
+  try {
+    client.connect(20859, '193.193.165.165', function () {
+      console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
+      logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
+    });
+  } catch (error) {
+    logger.info("CRS - ERROR : " + error.message + " : " + bufferToHexString(data));
+  }
+
+  client.on("error", (err) => {
+    logger.info("CRS - Error Connecting : " + err.message);
+  });
+
+
+
+  function bufferToHexString(buffer) {
+    var str = '';
+    for (var i = 0; i < buffer.length; i++) {
+      if (buffer[i] < 16) {
+        str += '0';
+      }
+      str += buffer[i].toString(16);
+    }
+
+
+    console.log("bufferToHexString : ", str)
+    return str;
+  };
+
+  function isProxyCRSDevice(value) {
+    for (var i = 0; i < crsTerminals.length; i++) {
+      if (value.indexOf(crsTerminals[i]) > -1) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     // logger.info("Connection Obj: " + Object.toString(connection));
-
-    let bufferToHexString = function (buffer) {
-      var str = '';
-      for (var i = 0; i < buffer.length; i++) {
-        if (buffer[i] < 16) {
-          str += '0';
-        }
-        str += buffer[i].toString(16);
-      }
-
-
-      console.log("bufferToHexString : ", str)
-      return str;
-    };
-
-
-    function isProxyCRSDevice(value) {
-      for (var i = 0; i < crsTerminals.length; i++) {
-        if (value.indexOf(crsTerminals[i]) > -1) {
-          return true;
-        }
-      }
-      return false;
-    }
-
     let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
     if (is_proxy_CRS_device) {
-      // //echo raw data package
-      // logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
-      // let proxyToCRSSocket = net.createConnection(
-      //   {
-      //     host: "193.193.165.165",
-      //     port: "20859",
-      //   },
-      //   () => {
-      //     logger.info("connected to CRS server");
+      //echo raw data package
+      logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+      client.write(data, () => {
+        logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
+      });
+
+      // let body = Buffer.from('');
+      // client.on('data', function (chunk) {
+      //   client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
+      //   try {
+      //     if (chunk && chunk.byteLength > 0) {
+      //       body = Buffer.concat([body, chunk]);
+      //     }
+      //     logger.info("CRS ON DATA - Collecting CRS server response data : " + bufferToHexString(body));
+
+      //   } catch (error) {
+      //     logger.info("CRS ON DATA - ERROR : " + error.message);
       //   }
-      // );
-      // proxyToCRSSocket.write(data, () => {
-      //   logger.info("Data Written to CRS server");
-      // });
-      // proxyToCRSSocket.on("error", (err) => {
-      //   logger.info("Error Connecting : " + err.message);
       // });
 
-      let client = new net.Socket();
+      // client.on('end', function () {
+      //   try {
+      //     logger.info("CRS ON END: - All Data received from CRS server : " + bufferToHexString(body) + " FROM : " + bufferToHexString(data));
+      //     logger.info("CRS ON END- Destroy Connection " + bufferToHexString(data));
+      //     client.destroy(); // kill client after server's response 
+      //   } catch (error) {
+      //     logger.info("CRS - ERROR ON END: " + error.message + " : " + bufferToHexString(data));
+      //   }
+      // })
 
-      try {
-        client.connect(20859, '193.193.165.165', function () {
-          console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
-          logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
-        });
-      } catch (error) {
-        logger.info("CRS - ERROR : " + error.message + " : " + bufferToHexString(data));
-      }
-      let body = Buffer.from('');
-      client.on('data', function (chunk) {
-        try {
-          if (chunk && chunk.byteLength > 0) {
-            body = Buffer.concat([body, chunk]);
-          }
-          logger.info("CRS ON DATA - Collecting CRS server response data : " + bufferToHexString(body));
-
-          client.write(data) ? logger.info("CRS ON DATA - WRITE SUCCESSFUL : " + bufferToHexString(data)) : logger.info("CRS - WRITE NOT SUCCESSFUL : " + bufferToHexString(data)); // send info to Server
-
-        } catch (error) {
-          logger.info("CRS ON DATA - ERROR : " + error.message);
-        }
-      });
-
-      client.on('end', function () {
-        try {
-          logger.info("CRS ON END: - All Data received from CRS server : " + bufferToHexString(body) + " FROM : " + bufferToHexString(data));
-          logger.info("CRS ON END- Destroy Connection " + bufferToHexString(data));
-          client.destroy(); // kill client after server's response 
-        } catch (error) {
-          logger.info("CRS - ERROR ON END: " + error.message + " : " + bufferToHexString(data));
-        }
-      })
-
-      client.on('close', function () {
-        logger.info("CRS ON CLOSE - Connection closed " + bufferToHexString(data));
-        console.log('CRS Connection closed ' + bufferToHexString(data));
-      });
+      // client.on('close', function () {
+      //   logger.info("CRS ON CLOSE - Connection closed " + bufferToHexString(data));
+      //   console.log('CRS Connection closed ' + bufferToHexString(data));
+      // });
 
     } else {
       //echo raw data package
