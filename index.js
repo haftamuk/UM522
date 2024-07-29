@@ -157,8 +157,8 @@ var server = gps.server(options, function (device, connection) {
       logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
       let proxyToCRSSocket = net.createConnection(
         {
-          host: "ch1181857.flespi.gw",
-          port: "24918",
+          host: "193.193.165.165",
+          port: "20859",
         },
         () => {
           logger.info("connected to CRS server");
