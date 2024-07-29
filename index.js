@@ -54,8 +54,7 @@ var server = gps.server(options, function (device, connection) {
   device.on("disconnected", function () {
     logger.info("CRS - Device DISCONNECTED");
     console.log('DEVICE DISConnected ');  // acknowledge socket connection
-    client.end(); // kill client after server's response 
-
+    // client.end(); // kill client after server's response 
   });
 
   device.on("login_request", function (device_id, msg_parts) {
