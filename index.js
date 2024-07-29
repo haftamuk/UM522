@@ -129,7 +129,7 @@ var server = gps.server(options, function (device, connection) {
   try {
     client.connect(20859, '193.193.165.165', function () {
       console.log('CRS- Connected ');  // acknowledge socket connection
-      logger.info("CRS ON CONNECT - Data Written to CRS server : ");
+      logger.info("CRS - CONNECTED.");
     });
   } catch (error) {
     logger.info("CRS - ERROR : " + error.message);
@@ -164,6 +164,10 @@ var server = gps.server(options, function (device, connection) {
     return false;
   }
 
+  connection.on("close", function () {
+    logger.info("CRS - Connection closed. ");
+    client.destroy(); // kill client after server's response 
+  })
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
