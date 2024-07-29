@@ -32,21 +32,24 @@ client.on("error", (err) => {
 
 
 var server = gps.server(options, function (device, connection) {
-  try {
-    client.connect(20859, '193.193.165.165', function () {
-      console.log('CRS- Connected ');  // acknowledge socket connection
-      logger.info("CRS - CONNECTED.");
-    });
-  } catch (error) {
-    logger.info("CRS - ERROR : " + error.message);
-  }
 
   device.on("connected", function () {
-    //    logger.info("I'm a new device CONNECTED");
+    try {
+      client.connect(20859, '193.193.165.165', function () {
+        console.log('CRS- Connected ');  // acknowledge socket connection
+        logger.info("CRS - CONNECTED.");
+      });
+      console.log('DEVICE Connected ');  // acknowledge socket connection
+
+    } catch (error) {
+      logger.info("CRS - ERROR : " + error.message);
+    }
     logger.info('I am a new device CONNECTED');
   });
+
   device.on("disconnected", function () {
-    logger.info("Device DISCONNECTED");
+    logger.info("CRS - Device DISCONNECTED");
+    console.log('DEVICE DISConnected ');  // acknowledge socket connection
     client.destroy(); // kill client after server's response 
   });
 
@@ -163,6 +166,29 @@ var server = gps.server(options, function (device, connection) {
     }
     return false;
   }
+
+
+  //Also, you can listen on the native connection object
+  connection.on("connect", function () {
+    try {
+      client.connect(20859, '193.193.165.165', function () {
+        console.log('CRS- Connected ');  // acknowledge socket connection
+        logger.info("CRS - CONNECTED.");
+      });
+      console.log('DEVICE Connected ');  // acknowledge socket connection
+
+    } catch (error) {
+      logger.info("CRS - ERROR : " + error.message);
+    }
+  });
+
+  connection.on("end", function () {
+    logger.info("CRS - Device DISCONNECTED");
+    console.log('DEVICE DISConnected ');  // acknowledge socket connection
+    client.end(); // kill client after server's response 
+  });
+
+
 
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
