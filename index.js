@@ -172,25 +172,38 @@ var server = gps.server(options, function (device, connection) {
       // });
 
       let client = new net.Socket();
-      client.connect(20859, '193.193.165.165', function () {
-        console.log('Connected');  // acknowledge socket connection
-        client.write(data); // send info to Server
-        logger.info("Data Written to CRS server : " + bufferToHexString(data));
-      });
 
+      try {
+        client.connect(20859, '193.193.165.165', function () {
+          console.log('CRS- Connected');  // acknowledge socket connection
+          client.write(data); // send info to Server
+          logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
+        });
+      } catch (error) {
+        logger.info("CRS - ERROR : " + error.message);
+      }
       let body = Buffer.from('');
       client.on('data', function (chunk) {
-        if (chunk && chunk.byteLength > 0) {
-          body = Buffer.concat([body, chunk]);
+        try {
+          if (chunk && chunk.byteLength > 0) {
+            body = Buffer.concat([body, chunk]);
+          }
+          logger.info("Collecting CRS server response data : " + bufferToHexString(body));
+
+        } catch (error) {
+          logger.info("CRS - ERROR : " + error.message);
         }
-        logger.info("Collecting CRS server response data");
       });
 
       client.on('end', function () {
-        logger.info(bufferToHexString(body));
-        logger.info("CRS: - All Data received from CRS server");
-        logger.info("CRS - Destroy Connection");
-        client.destroy(); // kill client after server's response
+        try {
+          logger.info(bufferToHexString(body));
+          logger.info("CRS: - All Data received from CRS server");
+          logger.info("CRS - Destroy Connection");
+          client.destroy(); // kill client after server's response 
+        } catch (error) {
+          logger.info("CRS - ERROR : " + error.message);
+        }
       })
       client.on('close', function () {
         logger.info("CRS - Connection closed");
