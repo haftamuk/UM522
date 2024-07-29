@@ -175,7 +175,7 @@ var server = gps.server(options, function (device, connection) {
       try {
         client.connect(20859, '193.193.165.165', function () {
           console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
-          client.write(data); // send info to Server
+          client.write(data) ? logger.info("CRS - WRITE SUCCESSFUL") : logger.info("CRS - WRITE NOT SUCCESSFUL"); // send info to Server
           logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
         });
       } catch (error) {
