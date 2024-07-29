@@ -128,11 +128,11 @@ var server = gps.server(options, function (device, connection) {
 
   try {
     client.connect(20859, '193.193.165.165', function () {
-      console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
-      logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
+      console.log('CRS- Connected ');  // acknowledge socket connection
+      logger.info("CRS ON CONNECT - Data Written to CRS server : ");
     });
   } catch (error) {
-    logger.info("CRS - ERROR : " + error.message + " : " + bufferToHexString(data));
+    logger.info("CRS - ERROR : " + error.message);
   }
 
   client.on("error", (err) => {
