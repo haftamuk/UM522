@@ -19,7 +19,6 @@ const transport = pino.transport({
 // Plates: Land cruiser(74740) / UM552, 62940 / um552, 77437 / UM552, 3-B77827 / UM552, A65331/ TK003, 3-16636/ TK003,  B77849 / TK003
 const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174", "0868720061898619", "0358657104517136", "0358657103861956", "0358657104813964"]
 
-
 const logger = pino(transport);
 
 
@@ -175,12 +174,12 @@ var server = gps.server(options, function (device, connection) {
 
       try {
         client.connect(20859, '193.193.165.165', function () {
-          console.log('CRS- Connected');  // acknowledge socket connection
+          console.log('CRS- Connected ' + bufferToHexString(data));  // acknowledge socket connection
           client.write(data); // send info to Server
-          logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
+          logger.info("CRS ON CONNECT - Data Written to CRS server : " + bufferToHexString(data));
         });
       } catch (error) {
-        logger.info("CRS - ERROR : " + error.message);
+        logger.info("CRS - ERROR : " + error.message + " : " + bufferToHexString(data));
       }
       let body = Buffer.from('');
       client.on('data', function (chunk) {
@@ -188,25 +187,26 @@ var server = gps.server(options, function (device, connection) {
           if (chunk && chunk.byteLength > 0) {
             body = Buffer.concat([body, chunk]);
           }
-          logger.info("Collecting CRS server response data : " + bufferToHexString(body));
+          logger.info("CRS ON DATA - Collecting CRS server response data : " + bufferToHexString(body));
 
         } catch (error) {
-          logger.info("CRS - ERROR : " + error.message);
+          logger.info("CRS ON DATA - ERROR : " + error.message);
         }
       });
 
       client.on('end', function () {
         try {
-          logger.info("CRS: - All Data received from CRS server : " + bufferToHexString(body));
-          logger.info("CRS - Destroy Connection");
+          logger.info("CRS ON END: - All Data received from CRS server : " + bufferToHexString(body) + " FROM : " + bufferToHexString(data));
+          logger.info("CRS ON END- Destroy Connection " + bufferToHexString(data));
           client.destroy(); // kill client after server's response 
         } catch (error) {
-          logger.info("CRS - ERROR : " + error.message);
+          logger.info("CRS - ERROR ON END: " + error.message + " : " + bufferToHexString(data));
         }
       })
+
       client.on('close', function () {
-        logger.info("CRS - Connection closed");
-        console.log('Connection closed');
+        logger.info("CRS ON CLOSE - Connection closed " + bufferToHexString(data));
+        console.log('CRS Connection closed ' + bufferToHexString(data));
       });
 
     } else {
