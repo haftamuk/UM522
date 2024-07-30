@@ -27,7 +27,7 @@ var server = gps.server(options, function (device, connection) {
   // #######################################################################################################################
   // ################################################# CRS ONLY ############################################################
   // #######################################################################################################################
-  const client = new net.Socket();
+  let client = new net.Socket();
 
   try {
     client.connect(20859, '193.193.165.165', function () {
@@ -47,6 +47,7 @@ var server = gps.server(options, function (device, connection) {
     console.log("==========================================================================");
 
   }
+
 
   client.on("error", (err) => {
     console.log("CRS - Error Connecting : " + err.message);
@@ -201,7 +202,10 @@ var server = gps.server(options, function (device, connection) {
 
     } else {
       //echo raw data package
+      console.log("==========================================================================");
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
+      console.log("==========================================================================");
+
     }
   });
 });
