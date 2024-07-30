@@ -93,9 +93,11 @@ var server = gps.server(options, function (device, connection) {
   });
 
   device.on("login_request", function (device_id, msg_parts) {
-    is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
+    is_proxy_CRS_device = crsTerminals.includes(device_id);
 
     logger.info("LOGIN_REQUEST EMITTED. My name is " + device_id);
+
+    console.log("LOGIN_REQUEST EMITTED. My name is " + device_id);
 
     this.login_authorized(true);
 
@@ -104,6 +106,7 @@ var server = gps.server(options, function (device, connection) {
     logger.info(JSON.stringify(msg_parts));
 
   });
+
 
   device.on("ping", function (data, msg_parts) {
     logger.info("PING REQUEST CONTENT MSG_PARTS: ");
