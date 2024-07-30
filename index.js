@@ -28,7 +28,7 @@ var server = gps.server(options, function (device, connection) {
   // ################################################# CRS ONLY ############################################################
   // #######################################################################################################################
   let client = new net.Socket();
-
+  let is_proxy_CRS_device = false;
   try {
     client.connect(20859, '193.193.165.165', function () {
       console.log("==========================================================================");
@@ -55,6 +55,31 @@ var server = gps.server(options, function (device, connection) {
   });
 
 
+  function bufferToHexString(buffer) {
+    var str = '';
+    for (var i = 0; i < buffer.length; i++) {
+      if (buffer[i] < 16) {
+        str += '0';
+      }
+      str += buffer[i].toString(16);
+    }
+
+
+    console.log("bufferToHexString : ", str)
+    return str;
+  };
+
+  function isProxyCRSDevice(value) {
+    for (var i = 0; i < crsTerminals.length; i++) {
+      if (value.indexOf(crsTerminals[i]) > -1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
+
 
   device.on("connected", function () {
     console.log('DEVICE Connected ');  // acknowledge socket connection
@@ -68,6 +93,8 @@ var server = gps.server(options, function (device, connection) {
   });
 
   device.on("login_request", function (device_id, msg_parts) {
+    is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
+
     logger.info("LOGIN_REQUEST EMITTED. My name is " + device_id);
 
     this.login_authorized(true);
@@ -158,29 +185,6 @@ var server = gps.server(options, function (device, connection) {
 
 
 
-  function bufferToHexString(buffer) {
-    var str = '';
-    for (var i = 0; i < buffer.length; i++) {
-      if (buffer[i] < 16) {
-        str += '0';
-      }
-      str += buffer[i].toString(16);
-    }
-
-
-    console.log("bufferToHexString : ", str)
-    return str;
-  };
-
-  function isProxyCRSDevice(value) {
-    for (var i = 0; i < crsTerminals.length; i++) {
-      if (value.indexOf(crsTerminals[i]) > -1) {
-        return true;
-      }
-    }
-    return false;
-  }
-
 
 
 
@@ -189,7 +193,6 @@ var server = gps.server(options, function (device, connection) {
   //Also, you can listen on the native connection object
   connection.on("data", function (data) {
     // logger.info("Connection Obj: " + Object.toString(connection));
-    let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
     if (is_proxy_CRS_device) {
       //echo raw data package
       console.log("==========================================================================");
