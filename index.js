@@ -21,30 +21,39 @@ const crsTerminals = ["0868720061903625", "0868720061906289", "0868720061905174"
 const logger = pino(transport);
 
 
-// #######################################################################################################################
-// ################################################# CRS ONLY ############################################################
-// #######################################################################################################################
-const client = new net.Socket();
-
-try {
-  client.connect(20859, '193.193.165.165', function () {
-    console.log('CRS- Connected ');  // acknowledge socket connection
-    logger.info("CRS - CONNECTED.");
-  });
-  console.log('CRS - DEVICE Connected ');  // acknowledge socket connection
-
-} catch (error) {
-  logger.info("CRS - ERROR : " + error.message);
-}
-
-client.on("error", (err) => {
-  console.log("CRS - Error Connecting : " + err.message);
-  logger.info("CRS - Error Connecting : " + err.message);
-});
-
 
 
 var server = gps.server(options, function (device, connection) {
+  // #######################################################################################################################
+  // ################################################# CRS ONLY ############################################################
+  // #######################################################################################################################
+  const client = new net.Socket();
+
+  try {
+    client.connect(20859, '193.193.165.165', function () {
+      console.log("==========================================================================");
+      console.log('CRS- Connected ');  // acknowledge socket connection
+      console.log("==========================================================================");
+
+      logger.info("CRS - CONNECTED.");
+    });
+    console.log('CRS - DEVICE Connected ');  // acknowledge socket connection
+
+  } catch (error) {
+
+    logger.info("CRS - ERROR : " + error.message);
+    console.log("==========================================================================");
+    console.log("CRS - ERROR : " + error.message);
+    console.log("==========================================================================");
+
+  }
+
+  client.on("error", (err) => {
+    console.log("CRS - Error Connecting : " + err.message);
+    logger.info("CRS - Error Connecting : " + err.message);
+  });
+
+
 
   device.on("connected", function () {
     console.log('DEVICE Connected ');  // acknowledge socket connection
@@ -182,12 +191,14 @@ var server = gps.server(options, function (device, connection) {
     let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
     if (is_proxy_CRS_device) {
       //echo raw data package
+      console.log("==========================================================================");
       console.log("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
-      logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
-      client.write(data, () => {
-        console.log("CRS - Data Written to CRS server : " + bufferToHexString(data));
-        logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
-      });
+      console.log("==========================================================================");
+      client.write(data)
+        ? console.log("CRS - Data Written to CRS server : " + bufferToHexString(data))
+        : console.log("CRS - NOT Written to CRS server : " + bufferToHexString(data));
+      console.log("==========================================================================");
+
     } else {
       //echo raw data package
       logger.info("MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data));
