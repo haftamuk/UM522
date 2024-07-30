@@ -182,8 +182,10 @@ var server = gps.server(options, function (device, connection) {
     let is_proxy_CRS_device = isProxyCRSDevice(bufferToHexString(data));
     if (is_proxy_CRS_device) {
       //echo raw data package
+      console.log("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
       logger.info("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
       client.write(data, () => {
+        console.log("CRS - Data Written to CRS server : " + bufferToHexString(data));
         logger.info("CRS - Data Written to CRS server : " + bufferToHexString(data));
       });
     } else {
