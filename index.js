@@ -1,21 +1,38 @@
-const token = "j8AqyzxzWToPcBudDE2xABrd";
-// const pino = require("pino");
 const net = require("net");
-
 var gps = require("gps-tracking");
+import 'dotenv/config';
 
-var options = {
-  debug: true, //We don't want to debug info automatically. We are going to log everything manually so you can check what happens everywhere
-  port: 6006,
-  device_adapter: "GT06",
+// API Endpoints
+const MOOVE_SERVER_BASE_URL = process.env.MOOVE_SERVER_BASE_URL;
+const API_ENDPOINTS = {
+  LOCATION: `${MOOVE_SERVER_BASE_URL}/api/gps/location`,
+  ALARM: `${MOOVE_SERVER_BASE_URL}/api/gps/alarm`,
+  STATUS: `${MOOVE_SERVER_BASE_URL}/api/gps/status`,
+  HEARTBEAT: `${MOOVE_SERVER_BASE_URL}/api/gps/heartbeat`,
+  LOGIN: `${MOOVE_SERVER_BASE_URL}/api/gps/login`,
+  LBS_LOCATION: `${MOOVE_SERVER_BASE_URL}/api/gps/lbs`,
+  STRING_INFO: `${MOOVE_SERVER_BASE_URL}/api/gps/string`,
+  COMMAND_RESPONSE: `${MOOVE_SERVER_BASE_URL}/api/gps/command-response`
 };
 
-// const transport = pino.transport({
-//   target: "@logtail/pino",
-//   options: { sourceToken: token },
-// });
-// Plates: Land cruiser(74740) / UM552, 62940 / um552, 77437 / UM552, 3-B77827 / UM552, A65331/ TK003, 3-16636/ TK003,  B77849 / TK003
+// CRS Server Configuration
+const CRS_SERVER = process.env.CRS_SERVER;
+const CRS_SERVER_PORT = process.env.CRS_SERVER_PORT || 20859;
+
+console.log(`Moove Server Base URL: ${MOOVE_SERVER_BASE_URL}`);
+console.log(`CRS Server: ${CRS_SERVER}:${CRS_SERVER_PORT}`);
+
+// Configuration
+var options = {
+  debug: true,
+  port: process.env.GPS_SERVER_PORT || 6006,
+  device_adapter: "GT06N",
+};
+
+// Terminal configurations
 const crsTerminals = [
+  "0868720063451946",
+  "0868720063452100",
   "0868720062933829",
   "0864943047255027",
   "0358657103600172",
@@ -31,196 +48,257 @@ const crsTerminals = [
   "0358657103861956",
   "0358657104813964",
 ];
+const terminalConfigs = {};
 
-// const logger = pino(transport);
-
+// Create GPS server
 var server = gps.server(options, function (device, connection) {
-  // #######################################################################################################################
-  // ################################################# CRS ONLY ############################################################
-  // #######################################################################################################################
-  let client = new net.Socket();
-  let is_proxy_CRS_device = false;
-  try {
-    client.connect(20859, "193.193.165.165", function () {
-      console.log(
-        "=========================================================================="
-      );
-      console.log("CRS- Connected "); // acknowledge socket connection
-      console.log(
-        "=========================================================================="
-      );
+  let crsClient = null;
+  let isCRSDevice = false;
+  const deviceIMEI = null;
 
-      console.log("CRS - CONNECTED.");
+  // Initialize CRS connection if needed
+  function initCRSConnection() {
+    if (!CRS_SERVER || crsClient) return;
+    
+    crsClient = new net.Socket();
+    
+    crsClient.connect(CRS_SERVER_PORT, CRS_SERVER, function () {
+      console.log("=".repeat(75));
+      console.log("CRS Server Connected");
+      console.log("=".repeat(75));
     });
-    console.log("CRS - DEVICE Connected "); // acknowledge socket connection
-  } catch (error) {
-    console.log("CRS - ERROR : " + error.message);
-    console.log(
-      "=========================================================================="
-    );
-    console.log("CRS - ERROR : " + error.message);
-    console.log(
-      "=========================================================================="
-    );
+
+    crsClient.on("error", (err) => {
+      console.error("CRS Connection Error:", err.message);
+      crsClient = null;
+    });
+
+    crsClient.on("close", () => {
+      console.log("CRS Connection Closed");
+      crsClient = null;
+    });
   }
 
-  client.on("error", (err) => {
-    console.log("CRS - Error Connecting : " + err.message);
-    console.log("CRS - Error Connecting : " + err.message);
-  });
+  // Helper function to send data to Moove API
+  async function sendToMooveAPI(endpoint, data) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-GPS-Protocol": "GT06N"
+        },
+        body: JSON.stringify({
+          device_id: device.getUID(),
+          timestamp: new Date().toISOString(),
+          ...data
+        })
+      });
+      
+      if (!response.ok) {
+        console.error(`API Error (${endpoint}):`, response.statusText);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Failed to send data to ${endpoint}:`, error.message);
+    }
+  }
+
+  // Helper function to proxy data to CRS server
+  function proxyToCRS(data) {
+    if (!crsClient || !isCRSDevice) return;
+    
+    try {
+      const hexData = bufferToHexString(data);
+      console.log("Proxying to CRS:", hexData.substring(0, 50) + "...");
+      crsClient.write(data);
+    } catch (error) {
+      console.error("CRS Proxy Error:", error.message);
+    }
+  }
 
   function bufferToHexString(buffer) {
-    var str = "";
-    for (var i = 0; i < buffer.length; i++) {
-      if (buffer[i] < 16) {
-        str += "0";
-      }
-      str += buffer[i].toString(16);
-    }
-
-    console.log("bufferToHexString : ", str);
-    return str;
+    return Array.from(buffer)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
   }
 
-  function isProxyCRSDevice(value) {
-    for (var i = 0; i < crsTerminals.length; i++) {
-      if (value.indexOf(crsTerminals[i]) > -1) {
-        return true;
-      }
-    }
-    return false;
-  }
-
+  // Device Event Handlers
   device.on("connected", function () {
-    console.log("DEVICE Connected "); // acknowledge socket connection
-    console.log("CRS - I am a new device CONNECTED");
+    console.log("Device Connected - IP:", connection.remoteAddress);
+    initCRSConnection();
   });
 
   device.on("disconnected", function () {
-    console.log("CRS - Device DISCONNECTED");
-    console.log("DEVICE DISConnected "); // acknowledge socket connection
-    // client.end(); // kill client after server's response
+    console.log("Device Disconnected:", device.getUID());
+    if (crsClient) {
+      crsClient.destroy();
+    }
   });
 
   device.on("login_request", function (device_id, msg_parts) {
-    is_proxy_CRS_device = crsTerminals.includes(device_id);
-
-    console.log("LOGIN_REQUEST EMITTED. My name is " + device_id);
-
-    console.log("LOGIN_REQUEST EMITTED. My name is " + device_id);
-
     this.login_authorized(true);
-
-    console.log("Ok, " + device_id + ", you're accepted!");
-    console.log("LOGIN REQUEST CONTENT : ");
-    console.log(JSON.stringify(msg_parts));
+    console.log("Device Login:", device_id);
+    
+    // Check if this is a CRS device
+    isCRSDevice = crsTerminals.includes(device_id);
+    
+    // Send login event to Moove
+    sendToMooveAPI(API_ENDPOINTS.LOGIN, {
+      imei: device_id,
+      terminal_info: msg_parts.terminal_info,
+      protocol_version: "GT06N"
+    });
   });
 
-  device.on("ping", function (data, msg_parts) {
-    console.log("PING REQUEST CONTENT MSG_PARTS: ");
-    console.log(JSON.stringify(msg_parts));
+  device.on("location", function (locationData, msg_parts) {
+    console.log("Location Data:", {
+      device: locationData.device_id,
+      lat: locationData.latitude,
+      lng: locationData.longitude,
+      speed: locationData.speed,
+      satellites: locationData.satellites
+    });
 
-    console.log("PING REQUEST CONTENT DATA: ");
-    console.log(JSON.stringify(data));
-    /**
-     * #######################################################################
-     * ########## SENDING LOCATION INFORMATION TO SERVER ######################
-     * #######################################################################
-     */
-    fetch(`http://78.47.144.132:3000/api/GPSLocationFeed`, {
-      method: "POST",
-      mode: "cors",
-      body: JSON.stringify({ data: data }),
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
+    // Send to Moove API
+    sendToMooveAPI(API_ENDPOINTS.LOCATION, {
+      type: "location",
+      latitude: locationData.latitude,
+      longitude: locationData.longitude,
+      speed: locationData.speed,
+      course: locationData.course,
+      satellites: locationData.satellites,
+      accuracy: locationData.gps_status === '1' ? 'low' : 'high',
+      altitude: 0, // GT06N doesn't provide altitude
+      device_status: {
+        power: locationData.power_status,
+        charging: locationData.charge_status,
+        acc: locationData.acc_status,
+        armed: locationData.armed_status
       },
-    })
-      .then((response) => response.json())
-      .then((data) => console.log("MooveLocation Returned Data", data));
-    /**
-     * #######################################################################
-     */
+      raw_data: locationData.raw_data
+    });
 
-    //this = device
-    // console.log(
-    //   "I'm here: " +
-    //     data.latitude +
-    //     ", " +
-    //     data.longitude +
-    //     " (" +
-    //     this.getUID() +
-    //     ")"
-    // );
-
-    //Look what informations the device sends to you (maybe velocity, gas level, etc)
-    //    console.log("HERE IS GPS Tracker data sent:", JSON.stringify(data));
-    return data;
+    // Proxy to CRS if applicable
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
   });
 
-  device.on("alarm", function (alarm_code, alarm_data, msg_data) {
-    console.log("ALARM REQUEST CONTENT MSG_PARTS: ");
-    console.log(JSON.stringify(msg_data));
+  device.on("alarm", function (alarm_type, alarmData, msg_parts) {
+    console.log("Alarm Received:", {
+      device: alarmData.device_id,
+      type: alarm_type,
+      location: `${alarmData.latitude}, ${alarmData.longitude}`
+    });
 
-    console.log(
-      "Help! Something happend: " + alarm_code + " (" + alarm_data.msg + ")"
-    );
-
-    /**
-     * #######################################################################
-     * ##########SENDING ALARM AND LOCATION INFORMATION TO SERVER ############
-     * #######################################################################
-     */
-    fetch(`http://78.47.144.132:3000/api/GPSLocationFeed`, {
-      method: "POST",
-      mode: "cors",
-      body: JSON.stringify({ data: alarm_data }),
-      headers: {
-        "Content-Type": "application/json; charset=UTF-8",
+    // Send to Moove API
+    sendToMooveAPI(API_ENDPOINTS.ALARM, {
+      type: "alarm",
+      alarm_type: alarm_type,
+      alarm_code: alarmData.alarm_type,
+      latitude: alarmData.latitude,
+      longitude: alarmData.longitude,
+      speed: alarmData.speed,
+      device_status: {
+        power: alarmData.power_status,
+        charging: alarmData.charge_status,
+        acc: alarmData.acc_status,
+        armed: alarmData.armed_status
       },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("MooveLocation Returned Result.");
-        // console.log(data);
-      });
-    /**
-     * #######################################################################
-     */
+      raw_data: alarmData.raw_data
+    });
+
+    // Proxy to CRS
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
   });
 
-  //Also, you can listen on the native connection object
+  device.on("heartbeat", function (heartbeatData, msg_parts) {
+    console.log("Heartbeat from:", heartbeatData.device_id);
+
+    sendToMooveAPI(API_ENDPOINTS.HEARTBEAT, {
+      type: "heartbeat",
+      online: true,
+      timestamp: heartbeatData.timestamp
+    });
+
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
+  });
+
+  device.on("status", function (statusData, msg_parts) {
+    console.log("Status Update:", {
+      device: statusData.device_id,
+      voltage: statusData.voltage_level,
+      gsm_signal: statusData.gsm_signal
+    });
+
+    sendToMooveAPI(API_ENDPOINTS.STATUS, {
+      type: "status",
+      voltage: statusData.voltage_level,
+      gsm_signal: statusData.gsm_signal,
+      alarm_zone: statusData.alarm_zone,
+      raw_data: statusData.raw_data
+    });
+
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
+  });
+
+  device.on("lbs_location", function (lbsData, msg_parts) {
+    console.log("LBS Location:", lbsData.device_id);
+
+    sendToMooveAPI(API_ENDPOINTS.LBS_LOCATION, {
+      type: "lbs_location",
+      raw_data: lbsData.raw_data
+    });
+
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
+  });
+
+  device.on("string_info", function (stringData, msg_parts) {
+    console.log("String Info:", stringData.device_id);
+
+    sendToMooveAPI(API_ENDPOINTS.STRING_INFO, {
+      type: "string_info",
+      data: stringData.data
+    });
+
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
+  });
+
+  device.on("command_response", function (responseData, msg_parts) {
+    console.log("Command Response:", responseData.device_id);
+
+    sendToMooveAPI(API_ENDPOINTS.COMMAND_RESPONSE, {
+      type: "command_response",
+      response: responseData.response
+    });
+
+    proxyToCRS(Buffer.from(msg_parts.raw, 'hex'));
+  });
+
+  // Handle raw connection data for logging
   connection.on("data", function (data) {
-    // console.log("Connection Obj: " + Object.toString(connection));
-    if (is_proxy_CRS_device) {
-      //echo raw data package
-      console.log(
-        "=========================================================================="
-      );
-      console.log("CRS - RAW DATA emitted : IMEI - " + bufferToHexString(data));
-      console.log(
-        "=========================================================================="
-      );
-      client.write(data)
-        ? console.log(
-            "CRS - Data Written to CRS server : " + bufferToHexString(data)
-          )
-        : console.log(
-            "CRS - NOT Written to CRS server : " + bufferToHexString(data)
-          );
-      console.log(
-        "=========================================================================="
-      );
-    } else {
-      //echo raw data package
-      console.log(
-        "=========================================================================="
-      );
-      console.log(
-        "MOOVE Location - RAW DATA emitted : IMEI - " + bufferToHexString(data)
-      );
-      console.log(
-        "=========================================================================="
-      );
+    const hexData = bufferToHexString(data);
+    console.log("=".repeat(75));
+    console.log("Raw Data (", data.length, "bytes):", hexData.substring(0, 100));
+    
+    // Log based on protocol
+    if (hexData.startsWith('7878') || hexData.startsWith('7979')) {
+      const protocol = hexData.substr(6, 2);
+      console.log("Protocol ID:", protocol);
     }
+    console.log("=".repeat(75));
+  });
+
+  // Handle commands from Moove API (optional)
+  connection.on("command", function (command) {
+    console.log("Received command:", command);
+    // Implement command handling if needed
   });
 });
+
+// Handle server errors
+server.on("error", function (err) {
+  console.error("Server Error:", err);
+});
+
+console.log(`GPS Server listening on port ${options.port}`);
