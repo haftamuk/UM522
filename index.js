@@ -3,15 +3,11 @@ import { createRequire } from "module";
 import 'dotenv/config';
 
 const require = createRequire(import.meta.url);
-
-// Import gps-tracking
 const gpsTracking = require("gps-tracking");
 const gps = gpsTracking;
 
-// Load custom adapter
-const customAdapter = require('./node_modules/gps-tracking/lib/adapters/gt06.js');
-
-// Register the adapter with gps-tracking library
+// Import custom adapter
+const customAdapter = require('./adapters/gt06n.js');
 if (!gps.server.availableAdapters) {
   gps.server.availableAdapters = {};
 }
@@ -27,8 +23,8 @@ const API_ENDPOINTS = {
   LOGIN: `${MOOVE_SERVER_BASE_URL}/api/gps/login`
 };
 
+console.log(`Starting GPS Server...`);
 console.log(`Moove Server Base URL: ${MOOVE_SERVER_BASE_URL}`);
-console.log(`GPS Server starting...`);
 
 // Server configuration
 const options = {
@@ -37,70 +33,103 @@ const options = {
   device_adapter: "GT06N",
 };
 
+// Queue for API requests to prevent overload
+class RequestQueue {
+  constructor(maxConcurrent = 5) {
+    this.queue = [];
+    this.active = 0;
+    this.maxConcurrent = maxConcurrent;
+  }
+
+  async add(requestFn) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ requestFn, resolve, reject });
+      this.process();
+    });
+  }
+
+  async process() {
+    if (this.active >= this.maxConcurrent || this.queue.length === 0) {
+      return;
+    }
+
+    this.active++;
+    const { requestFn, resolve, reject } = this.queue.shift();
+
+    try {
+      const result = await requestFn();
+      resolve(result);
+    } catch (error) {
+      reject(error);
+    } finally {
+      this.active--;
+      this.process();
+    }
+  }
+}
+
+const requestQueue = new RequestQueue(3); // Max 3 concurrent requests
+
 // Create GPS server
 const server = gps.server(options, function (device, connection) {
-  console.log(`New device connection from ${connection.remoteAddress}:${connection.remotePort}`);
+  console.log(`New connection from ${connection.remoteAddress}:${connection.remotePort}`);
   
-  let deviceIMEI = null;
-
-  // Helper function to send data to API
+  // Helper function with queue
   async function sendToAPI(endpoint, data) {
-    try {
-      console.log(`Sending to ${endpoint}:`, JSON.stringify(data, null, 2));
-      
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data)
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error (${endpoint}): ${response.status} ${response.statusText}`, errorText);
-      } else {
-        const result = await response.json();
-        console.log(`API Success (${endpoint})`);
-        return result;
+    return requestQueue.add(async () => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`API Error (${endpoint}): ${response.status}`, errorText.substring(0, 200));
+          return null;
+        }
+        
+        return await response.json();
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          console.error(`API Timeout (${endpoint})`);
+        } else {
+          console.error(`Failed to send to ${endpoint}:`, error.message);
+        }
+        return null;
       }
-    } catch (error) {
-      console.error(`Failed to send to ${endpoint}:`, error.message);
-    }
+    });
   }
 
   // Device event handlers
-  device.on("connected", function () {
-    console.log("Device connected");
-  });
-
-  device.on("disconnected", function () {
-    console.log("Device disconnected:", device.getUID());
-  });
-
   device.on("login_request", function (device_id, msg_parts) {
-    console.log(`Login request from ${device_id}`);
-    deviceIMEI = device_id;
+    console.log(`Login from ${device_id}`);
     this.login_authorized(true);
     
-    // Send to API
     sendToAPI(API_ENDPOINTS.LOGIN, {
       device_id: device_id,
       imei: device_id,
       protocol_version: "GT06N",
       ip_address: connection.remoteAddress,
       timestamp: new Date().toISOString()
-    });
+    }).catch(() => { /* Ignore errors */ });
   });
 
   device.on("ping", function (data, msg_parts) {
-    console.log(`Location data from ${data.device_id || device.getUID()}`);
-    
-    if (!data.device_id && device.getUID()) {
-      data.device_id = device.getUID();
+    if (!data.device_id) {
+      console.log('No device_id in location data');
+      return;
     }
     
-    // Send to API
+    console.log(`Location from ${data.device_id}`);
+    
     sendToAPI(API_ENDPOINTS.LOCATION, {
       device_id: data.device_id,
       latitude: data.latitude,
@@ -113,15 +142,19 @@ const server = gps.server(options, function (device, connection) {
       timestamp: data.date || new Date().toISOString(),
       timestampDate: data.timestampDate || new Date(),
       type: 'location'
-    });
+    }).catch(() => { /* Ignore errors */ });
   });
 
   device.on("alarm", function (alarm_code, alarm_data, msg_parts) {
-    console.log(`Alarm ${alarm_code} from ${alarm_data.device_id || device.getUID()}`);
+    if (!alarm_data.device_id) {
+      console.log('No device_id in alarm data');
+      return;
+    }
     
-    // Send to API
+    console.log(`Alarm ${alarm_code} from ${alarm_data.device_id}`);
+    
     sendToAPI(API_ENDPOINTS.ALARM, {
-      device_id: alarm_data.device_id || device.getUID(),
+      device_id: alarm_data.device_id,
       alarm_type: alarm_code,
       alarm_code: alarm_data.alarm_code || alarm_code,
       latitude: alarm_data.latitude,
@@ -132,25 +165,21 @@ const server = gps.server(options, function (device, connection) {
       timestamp: alarm_data.date || new Date().toISOString(),
       timestampDate: alarm_data.timestampDate || new Date(),
       type: 'alarm'
-    });
+    }).catch(() => { /* Ignore errors */ });
   });
 
   device.on("heartbeat", function (data, msg_parts) {
-    console.log(`Heartbeat from ${data.device_id || device.getUID()}`);
+    const deviceId = data.device_id || device.getUID();
+    if (!deviceId) return;
     
-    // Send to API
+    console.log(`Heartbeat from ${deviceId}`);
+    
     sendToAPI(API_ENDPOINTS.HEARTBEAT, {
-      device_id: data.device_id || device.getUID(),
+      device_id: deviceId,
       online: true,
       timestamp: new Date().toISOString(),
       type: 'heartbeat'
-    });
-  });
-
-  // Handle raw data for debugging
-  connection.on("data", function (data) {
-    const hex = Buffer.from(data).toString('hex');
-    console.log(`Raw data (${data.length} bytes): ${hex}`);
+    }).catch(() => { /* Ignore errors */ });
   });
 });
 
