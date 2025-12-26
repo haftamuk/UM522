@@ -1,6 +1,7 @@
 const net = require("net");
-var gps = require("gps-tracking");
-import 'dotenv/config';
+const gps = require("gps-tracking");
+require('dotenv/config');
+
 
 // API Endpoints
 const MOOVE_SERVER_BASE_URL = process.env.MOOVE_SERVER_BASE_URL;
