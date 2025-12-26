@@ -9,7 +9,7 @@ const gpsTracking = require("gps-tracking");
 const gps = gpsTracking;
 
 // Load custom adapter
-const customAdapter = require('./adapters/gt06n.js');
+const customAdapter = require('./node_modules/gps-tracking/lib/adapters/gt06.js');
 
 // Register the adapter with gps-tracking library
 if (!gps.server.availableAdapters) {
