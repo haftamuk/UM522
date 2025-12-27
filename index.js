@@ -210,7 +210,7 @@ const server = gps.server(options, function (device, connection) {
       return;
     }
     is_proxy_CRS_device = crsTerminals.includes(data.device_id);
-    console.log(`alarm : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
+    console.log(`alarm : is_proxy_CRS_device is chacked againest terminal:`, alarm_data.device_id);
 
     console.log(`Alarm ${alarm_code} from ${alarm_data.device_id}`);
     
@@ -233,7 +233,7 @@ const server = gps.server(options, function (device, connection) {
     const deviceId = data.device_id || device.getUID();
     if (!deviceId) return;
     is_proxy_CRS_device = crsTerminals.includes(data.device_id);
-    console.log(`heartbeat : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
+    console.log(`heartbeat : is_proxy_CRS_device is chacked againest terminal:`, deviceId);
 
     console.log(`Heartbeat from ${deviceId}`);
     
