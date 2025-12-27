@@ -2,6 +2,7 @@ import net from "net";
 import { createRequire } from "module";
 import 'dotenv/config';
 
+
 const require = createRequire(import.meta.url);
 const gpsTracking = require("gps-tracking");
 const gps = gpsTracking;
@@ -32,6 +33,25 @@ const options = {
   port: process.env.GPS_SERVER_PORT || 6006,
   device_adapter: "GT06N",
 };
+
+
+const crsTerminals = [
+  "0868720062933829",
+  "0864943047255027",
+  "0358657103600172",
+  "0358657103608399",
+  "0358657103600453",
+  "0358657105060953",
+  "0358657104462051",
+  "0868720061903625",
+  "0868720061906289",
+  "0868720061905174",
+  "0868720061898619",
+  "0358657104517136",
+  "0358657103861956",
+  "0358657104813964",
+];
+
 
 // Queue for API requests to prevent overload
 class RequestQueue {
@@ -74,6 +94,39 @@ const requestQueue = new RequestQueue(3); // Max 3 concurrent requests
 const server = gps.server(options, function (device, connection) {
   console.log(`New connection from ${connection.remoteAddress}:${connection.remotePort}`);
   
+    let client = new net.Socket();
+  let is_proxy_CRS_device = false;
+  try {
+    client.connect(process.env.CRS_SERVER_PORT, process.env.CRS_SERVER, function () {
+      console.log(
+        "=========================================================================="
+      );
+      console.log("CRS- Connected "); // acknowledge socket connection
+      console.log(
+        "=========================================================================="
+      );
+
+      console.log("CRS - CONNECTED.");
+    });
+    console.log("CRS - DEVICE Connected "); // acknowledge socket connection
+  } catch (error) {
+    console.log("CRS - ERROR : " + error.message);
+    console.log(
+      "=========================================================================="
+    );
+    console.log("CRS - ERROR : " + error.message);
+    console.log(
+      "=========================================================================="
+    );
+  }
+
+  client.on("error", (err) => {
+    console.log("CRS - Error Connecting : " + err.message);
+    console.log("CRS - Error Connecting : " + err.message);
+  });
+
+
+
   // Helper function with queue
   async function sendToAPI(endpoint, data) {
     return requestQueue.add(async () => {
@@ -112,7 +165,9 @@ const server = gps.server(options, function (device, connection) {
   device.on("login_request", function (device_id, msg_parts) {
     console.log(`Login from ${device_id}`);
     this.login_authorized(true);
-    
+    is_proxy_CRS_device = crsTerminals.includes(device_id);
+    console.log(`login_request : is_proxy_CRS_device is chacked againest terminal:`, device_id);
+
     sendToAPI(API_ENDPOINTS.LOGIN, {
       device_id: device_id,
       imei: device_id,
@@ -127,7 +182,9 @@ const server = gps.server(options, function (device, connection) {
       console.log('No device_id in location data');
       return;
     }
-    
+    is_proxy_CRS_device = crsTerminals.includes(data.device_id);
+    console.log(`ping : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
+
     console.log(`Location from ${data.device_id}`);
     
     sendToAPI(API_ENDPOINTS.LOCATION, {
@@ -150,7 +207,9 @@ const server = gps.server(options, function (device, connection) {
       console.log('No device_id in alarm data');
       return;
     }
-    
+    is_proxy_CRS_device = crsTerminals.includes(data.device_id);
+    console.log(`alarm : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
+
     console.log(`Alarm ${alarm_code} from ${alarm_data.device_id}`);
     
     sendToAPI(API_ENDPOINTS.ALARM, {
@@ -171,7 +230,9 @@ const server = gps.server(options, function (device, connection) {
   device.on("heartbeat", function (data, msg_parts) {
     const deviceId = data.device_id || device.getUID();
     if (!deviceId) return;
-    
+    is_proxy_CRS_device = crsTerminals.includes(data.device_id);
+    console.log(`heartbeat : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
+
     console.log(`Heartbeat from ${deviceId}`);
     
     sendToAPI(API_ENDPOINTS.HEARTBEAT, {
@@ -181,6 +242,20 @@ const server = gps.server(options, function (device, connection) {
       type: 'heartbeat'
     }).catch(() => { /* Ignore errors */ });
   });
+
+
+  //Also, you can listen on the native connection object
+  connection.on("data", function (data) {
+    // console.log("Connection Obj: " + Object.toString(connection));
+    if (is_proxy_CRS_device) {
+      client.write(data)
+        ? console.log("CRS - Data Written to CRS server")
+        : console.log("CRS - NOT Written to CRS server");
+      console.log("==========================================================");
+    }
+  });
+
+
 });
 
 server.on("error", function (err) {
