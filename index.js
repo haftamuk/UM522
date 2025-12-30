@@ -168,7 +168,6 @@ const server = gps.server(options, function (device, connection) {
     console.log(`Login from ${device_id}`);
     this.login_authorized(true);
     is_proxy_CRS_device = crsTerminals.includes(device_id);
-    console.log(`login_request : is_proxy_CRS_device is chacked againest terminal:`, device_id);
 
     sendToAPI(API_ENDPOINTS.LOGIN, {
       device_id: device_id,
@@ -185,10 +184,11 @@ const server = gps.server(options, function (device, connection) {
       return;
     }
     is_proxy_CRS_device = crsTerminals.includes(data.device_id);
-    console.log(`ping : is_proxy_CRS_device is chacked againest terminal:`, data.device_id);
-
-    console.log(`Location from ${data.device_id}`);
     
+    console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    console.log("MOOVE Location object inspection")
+    console.log(data)
+    console.log("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     sendToAPI(API_ENDPOINTS.LOCATION, {
       device_id: data.device_id,
       latitude: data.latitude,
