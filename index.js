@@ -209,7 +209,7 @@ const server = gps.server(options, function (device, connection) {
       console.log('No device_id in alarm data');
       return;
     }
-    is_proxy_CRS_device = crsTerminals.includes(data.device_id);
+    is_proxy_CRS_device = crsTerminals.includes(alarm_data.device_id);
     console.log(`alarm : is_proxy_CRS_device is chacked againest terminal:`, alarm_data.device_id);
 
     console.log(`Alarm ${alarm_code} from ${alarm_data.device_id}`);
