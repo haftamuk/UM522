@@ -35,6 +35,7 @@ const options = {
 };
 
 
+// This are devices I need to proxy in to a different server.
 const crsTerminals = [
   "0868720063451946",
   "0868720063452100",
