@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { createHash } from 'crypto';
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 
 class DeviceProfiler {
   constructor() {
@@ -8,7 +8,7 @@ class DeviceProfiler {
     this.logDir = path.join(process.cwd(), 'logs');
     this.ensureLogDirectory();
     
-    // Device fingerprint database (extend as needed)
+    // Device fingerprint database
     this.deviceFingerprints = {
       // GT06 Variants
       '7878': { protocol: 'GT06', brand: 'Concox', family: 'GT06' },
@@ -22,7 +22,7 @@ class DeviceProfiler {
       'AT+': { protocol: 'UM552', brand: 'Unicore', family: 'UM' },
       'STX': { protocol: 'UM552', brand: 'Unicore', family: 'UM' },
       
-      // Common brands by IMEI prefix
+      // IMEI prefixes
       '86872': { brand: 'Teltonika', country: 'China' },
       '35865': { brand: 'Queclink', country: 'China' },
       '86494': { brand: 'Suntech', country: 'China' },
@@ -38,7 +38,7 @@ class DeviceProfiler {
   }
 
   generateDeviceFingerprint(data) {
-    const hash = createHash('md5');
+    const hash = crypto.createHash('md5');
     hash.update(data);
     return hash.digest('hex');
   }
@@ -48,7 +48,7 @@ class DeviceProfiler {
       timestamp: new Date().toISOString(),
       deviceId,
       rawLength: rawData.length,
-      hexPreview: rawData.slice(0, 100),
+      hexPreview: rawData.slice(0, 100).toString('hex'),
       protocols: [],
       brands: [],
       features: {}
@@ -61,25 +61,7 @@ class DeviceProfiler {
     // Check for GT06 protocol
     if (hexString.startsWith('7878') || hexString.startsWith('7979')) {
       analysis.protocols.push('GT06');
-      analysis.protocolVersion = hexString.substring(6, 8); // Protocol number
-      
-      // Extract firmware hints from data structure
-      if (hexString.length > 20) {
-        const dataLength = parseInt(hexString.substring(4, 6), 16);
-        analysis.dataStructure = `Length: ${dataLength}, Protocol: 0x${hexString.substring(6, 8)}`;
-        
-        // Try to extract date/time if present
-        if (dataLength > 10) {
-          const dateHex = hexString.substring(8, 20);
-          try {
-            const year = parseInt(dateHex.substring(0, 2), 16);
-            const month = parseInt(dateHex.substring(2, 4), 16);
-            if (year > 0 && month > 0 && month <= 12) {
-              analysis.hasDateTime = true;
-            }
-          } catch (e) {}
-        }
-      }
+      analysis.protocolVersion = hexString.substring(6, 8);
     }
 
     // Check for TK103 protocol
@@ -104,19 +86,6 @@ class DeviceProfiler {
           break;
         }
       }
-    }
-
-    // Feature detection based on data patterns
-    if (hexString.includes('0d0a')) {
-      analysis.hasCRLF = true; // GT06 standard
-    }
-    
-    if (hexString.length > 50 && hexString.includes('01cc')) {
-      analysis.hasMCC = true; // Contains Mobile Country Code
-    }
-    
-    if (hexString.includes('cf') || hexString.includes('c7')) {
-      analysis.hasGPSInfo = true; // GPS information present
     }
 
     return analysis;
@@ -204,7 +173,7 @@ class DeviceProfiler {
     const dateStr = timestamp.toISOString().split('T')[0];
     const hourStr = timestamp.getHours().toString().padStart(2, '0');
     
-    // Create directory structure: logs/raw/YYYY-MM-DD/
+    // Create directory structure
     const rawDir = path.join(this.logDir, 'raw', dateStr);
     if (!fs.existsSync(rawDir)) {
       fs.mkdirSync(rawDir, { recursive: true });
@@ -213,7 +182,7 @@ class DeviceProfiler {
     const logFile = path.join(rawDir, `raw_${hourStr}.log`);
     const hexString = rawData.toString('hex');
     const asciiPreview = rawData.toString('ascii', 0, Math.min(50, rawData.length))
-      .replace(/[^\x20-\x7E]/g, '.'); // Replace non-printable chars
+      .replace(/[^\x20-\x7E]/g, '.');
 
     const logEntry = {
       timestamp: timestamp.toISOString(),
@@ -274,4 +243,4 @@ class DeviceProfiler {
   }
 }
 
-export default DeviceProfiler;
+module.exports = DeviceProfiler;
