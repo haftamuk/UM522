@@ -3,6 +3,10 @@ const path = require('path');
 
 class EnhancedProfiler {
   constructor() {
+    this.devices = new Map(); // Store device profiles
+    this.logDir = path.join(process.cwd(), 'logs');
+    this.ensureLogDirectory();
+    
     this.brandDatabase = {
       // Teltonika devices (086872...)
       '086872': { brand: 'Teltonika', family: 'Teltonika GT06', features: ['GPS', 'GPRS', 'CRS'] },
@@ -37,6 +41,12 @@ class EnhancedProfiler {
       '22': { name: 'GPS + Address', type: 'location' },
       '26': { name: 'Alarm + Address', type: 'alarm' }
     };
+  }
+
+  ensureLogDirectory() {
+    if (!fs.existsSync(this.logDir)) {
+      fs.mkdirSync(this.logDir, { recursive: true });
+    }
   }
 
   analyzePacket(hexData, deviceId = null) {
@@ -89,6 +99,9 @@ class EnhancedProfiler {
         
         // Remove duplicates
         analysis.brands = [...new Set(analysis.brands)];
+        
+        // Update device profile
+        this.updateDeviceProfile(deviceId, analysis);
       }
 
       // Protocol-specific features
@@ -112,6 +125,134 @@ class EnhancedProfiler {
     }
 
     return analysis;
+  }
+
+  updateDeviceProfile(deviceId, analysis) {
+    if (!deviceId) return;
+    
+    if (!this.devices.has(deviceId)) {
+      this.devices.set(deviceId, {
+        firstSeen: new Date().toISOString(),
+        packets: [],
+        brands: new Set(),
+        protocols: new Set(),
+        packetTypes: new Set(),
+        features: new Set(),
+        connectionInfo: {}
+      });
+    }
+
+    const profile = this.devices.get(deviceId);
+    
+    profile.lastSeen = new Date().toISOString();
+    profile.packets.push(analysis);
+    
+    if (analysis.brands.length > 0) {
+      analysis.brands.forEach(brand => profile.brands.add(brand));
+    }
+    
+    if (analysis.protocol && analysis.protocol !== 'unknown') {
+      profile.protocols.add(analysis.protocol);
+    }
+    
+    if (analysis.packetType && analysis.packetType !== 'unknown') {
+      profile.packetTypes.add(analysis.packetType);
+    }
+    
+    if (analysis.features.length > 0) {
+      analysis.features.forEach(feature => profile.features.add(feature));
+    }
+  }
+
+  // ADD THIS METHOD - it was missing
+  getDeviceSummary() {
+    const summary = {
+      totalDevices: this.devices.size,
+      devicesByProtocol: {},
+      devicesByBrand: {},
+      recentlyActive: [],
+      crsDevices: []
+    };
+
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 3600000);
+
+    for (const [deviceId, profile] of this.devices) {
+      // Count by protocol
+      profile.protocols.forEach(protocol => {
+        summary.devicesByProtocol[protocol] = (summary.devicesByProtocol[protocol] || 0) + 1;
+      });
+
+      // Count by brand
+      profile.brands.forEach(brand => {
+        summary.devicesByBrand[brand] = (summary.devicesByBrand[brand] || 0) + 1;
+      });
+
+      // Recently active
+      const lastSeen = new Date(profile.lastSeen);
+      if (lastSeen > oneHourAgo) {
+        summary.recentlyActive.push({
+          deviceId,
+          lastSeen: profile.lastSeen,
+          protocols: Array.from(profile.protocols),
+          brands: Array.from(profile.brands),
+          packetTypes: Array.from(profile.packetTypes),
+          totalPackets: profile.packets.length
+        });
+      }
+
+      // Check if it's a CRS device (based on IMEI prefix)
+      if (deviceId.startsWith('086872') || deviceId.startsWith('035865') || deviceId.startsWith('086494')) {
+        summary.crsDevices.push({
+          deviceId,
+          lastSeen: profile.lastSeen,
+          totalPackets: profile.packets.length,
+          brands: Array.from(profile.brands)
+        });
+      }
+    }
+
+    return summary;
+  }
+
+  // ADD THIS METHOD TOO - for consistency with DeviceProfiler
+  getDeviceProfile(deviceId) {
+    return this.devices.get(deviceId);
+  }
+
+  // ADD THIS METHOD - for logging
+  logDeviceActivity(deviceId, activityType, data = {}) {
+    const date = new Date();
+    const dateStr = date.toISOString().split('T')[0];
+    const logDir = path.join(this.logDir, 'enhanced_profiles');
+    
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+
+    const logFile = path.join(logDir, `devices_${dateStr}.json`);
+    
+    const logEntry = {
+      timestamp: date.toISOString(),
+      deviceId,
+      activityType,
+      ...data
+    };
+
+    try {
+      let logs = [];
+      if (fs.existsSync(logFile)) {
+        const content = fs.readFileSync(logFile, 'utf8');
+        if (content.trim()) {
+          logs = JSON.parse(content);
+        }
+      }
+      
+      logs.push(logEntry);
+      fs.writeFileSync(logFile, JSON.stringify(logs, null, 2));
+    } catch (error) {
+      console.error('Error logging device activity:', error.message);
+    }
   }
 
   extractIMEIFromLogin(hexData) {
