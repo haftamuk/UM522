@@ -30,108 +30,114 @@ class DeviceProfiler {
     }
   }
 
-  analyzeRawData(rawData, deviceId = null) {
-    const analysis = {
-      timestamp: new Date().toISOString(),
-      deviceId,
-      rawLength: rawData.length,
-      hexPreview: rawData.slice(0, 100).toString('hex'),
-      protocols: [],
-      brands: [],
-      features: {},
-      isGT06: false,
-      protocolNumber: null
-    };
+analyzeRawData(rawData, deviceId = null) {
+  const analysis = {
+    timestamp: new Date().toISOString(),
+    deviceId,
+    rawLength: rawData.length,
+    hexPreview: rawData.slice(0, 100).toString('hex'),
+    protocols: [],
+    brands: [],
+    features: {},
+    isGT06: false,
+    protocolNumber: null,
+    packetType: 'Unknown'
+  };
 
+  try {
     const hexString = rawData.toString('hex');
-    const asciiString = rawData.toString('ascii', 0, Math.min(50, rawData.length));
-
+    analysis.fullHex = hexString; // For debugging
+    
     // Enhanced GT06 detection
     if (hexString.startsWith('7878') || hexString.startsWith('7979')) {
       analysis.protocols.push('GT06');
       analysis.isGT06 = true;
       
-      try {
-        // Extract protocol number
-        if (hexString.length >= 8) {
-          analysis.protocolNumber = hexString.substring(6, 8);
-          analysis.protocolVersion = `0x${analysis.protocolNumber}`;
-          
-          // Map protocol numbers to types
-          const protocolMap = {
-            '01': 'Login',
-            '10': 'GPS Data',
-            '11': 'GPS Data',
-            '12': 'Location Data',
-            '13': 'Heartbeat/Status',
-            '16': 'Alarm',
-            '17': 'LBS Location',
-            '1a': 'Address Query',
-            '22': 'GPS + Address',
-            '26': 'Alarm + Address'
-          };
-          
-          if (protocolMap[analysis.protocolNumber]) {
-            analysis.packetType = protocolMap[analysis.protocolNumber];
-          }
+      // Extract protocol number (byte after length)
+      if (hexString.length >= 8) {
+        analysis.protocolNumber = hexString.substring(6, 8);
+        
+        // Map protocol numbers to types
+        const protocolMap = {
+          '01': 'Login',
+          '10': 'GPS Data',
+          '11': 'GPS Data',
+          '12': 'Location Data',
+          '13': 'Heartbeat/Status',
+          '16': 'Alarm',
+          '17': 'LBS Location',
+          '1a': 'Address Query',
+          '22': 'GPS + Address',
+          '26': 'Alarm + Address'
+        };
+        
+        const lowerProtocol = analysis.protocolNumber.toLowerCase();
+        analysis.packetType = protocolMap[lowerProtocol] || `Unknown (0x${analysis.protocolNumber})`;
+      }
+      
+      // Try to extract IMEI from login packet (protocol 01)
+      if (analysis.protocolNumber === '01' && hexString.length >= 24) {
+        // Login packet: 7878 0D 01 IMEI(8 bytes) SERIAL CRC STOP
+        const imeiHex = hexString.substring(8, 24); // 8 bytes = 16 hex chars
+        
+        // Convert hex to decimal IMEI
+        let imei = '';
+        for (let i = 0; i < imeiHex.length; i += 2) {
+          const byte = imeiHex.substring(i, i + 2);
+          // Convert hex byte to decimal (pad with 0 if needed)
+          const decimal = parseInt(byte, 16).toString();
+          imei += decimal.padStart(2, '0');
         }
         
-        // Try to extract IMEI from login packet (protocol 01)
-        if (analysis.protocolNumber === '01' && hexString.length >= 24) {
-          // Login packet: 7878 0D 01 IMEI(8 bytes) SERIAL CRC STOP
-          const imeiHex = hexString.substring(8, 24); // 8 bytes = 16 hex chars
-          let imei = '';
-          for (let i = 0; i < imeiHex.length; i += 2) {
-            const byte = imeiHex.substring(i, i + 2);
-            imei += parseInt(byte, 16).toString().padStart(2, '0');
-          }
-          analysis.extractedIMEI = imei;
-          
-          if (!deviceId && imei) {
-            deviceId = imei;
-            analysis.deviceId = imei;
-          }
+        // IMEI should be 15 digits, trim if longer
+        if (imei.length > 15) {
+          imei = imei.substring(0, 15);
         }
-      } catch (error) {
-        console.error('Error analyzing GT06 data:', error.message);
+        
+        analysis.extractedIMEI = imei;
+        
+        if (!deviceId && imei) {
+          deviceId = imei;
+          analysis.deviceId = imei;
+        }
       }
-    }
-
-    // Check for TK103 protocol
-    if (asciiString.includes('imei:') || asciiString.includes('(') && asciiString.includes(')')) {
-      analysis.protocols.push('TK103');
-      analysis.protocols.push('TKStar');
-    }
-
-    // Check for UM552 protocol
-    if (asciiString.includes('AT+') || asciiString.includes('UM')) {
-      analysis.protocols.push('UM552');
-      analysis.protocols.push('Unicore');
     }
 
     // IMEI-based brand detection
     if (deviceId) {
       const cleanDeviceId = deviceId.toString().replace(/\s/g, '');
       
-      for (const [prefix, info] of Object.entries(this.deviceFingerprints)) {
-        if (cleanDeviceId.startsWith(prefix)) {
-          analysis.brands.push(info.brand);
-          analysis.family = info.family;
-          analysis.imeiPrefix = prefix;
-          Object.assign(analysis.features, info);
-          break;
+      // Check against known IMEI prefixes
+      if (cleanDeviceId.startsWith('086872') || cleanDeviceId.startsWith('86872')) {
+        analysis.brands.push('Teltonika');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'Teltonika';
+      } else if (cleanDeviceId.startsWith('035865') || cleanDeviceId.startsWith('35865')) {
+        analysis.brands.push('Queclink');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'Queclink';
+      } else if (cleanDeviceId.startsWith('086494') || cleanDeviceId.startsWith('86494')) {
+        analysis.brands.push('Suntech');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'Suntech';
+      } else if (cleanDeviceId.startsWith('86108')) {
+        analysis.brands.push('Concox');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'Concox';
+      } else if (cleanDeviceId.startsWith('86219')) {
+        analysis.brands.push('Meitrack');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'Meitrack';
+      } else {
+        // Generic GT06 detection
+        if (analysis.isGT06) {
+          analysis.brands.push('GT06 Family');
+          analysis.brands.push('Unknown Brand');
         }
       }
       
-      // If no brand detected but it's GT06, assume Concox
-      if (analysis.isGT06 && analysis.brands.length === 0) {
-        analysis.brands.push('Concox');
-        analysis.brands.push('GT06 Family');
-        analysis.family = 'GT06';
-      }
-      
-      // Check for specific device patterns in your CRS terminals
-      if (cleanDeviceId.startsWith('086872') || cleanDeviceId.startsWith('035865') || cleanDeviceId.startsWith('086494')) {
+      // Check if it's in CRS terminals
+      if (crsTerminals.includes(cleanDeviceId)) {
         analysis.isCRSDevice = true;
       }
     }
@@ -140,9 +146,13 @@ class DeviceProfiler {
     analysis.protocols = [...new Set(analysis.protocols)];
     analysis.brands = [...new Set(analysis.brands)];
 
-    return analysis;
+  } catch (error) {
+    console.error('Error in analyzeRawData:', error.message);
+    analysis.error = error.message;
   }
 
+  return analysis;
+}
   updateDeviceProfile(deviceId, analysis, connectionInfo = {}) {
     if (!deviceId) return null;
     

@@ -224,54 +224,56 @@ const server = gps.server(options, function (device, connection) {
     console.log(`Connection timeout for ${deviceId || 'unknown device'}`);
   });
 
-  // Device event handlers
-  device.on("login_request", function (device_id, msg_parts) {
-    packetsReceived++;
-    deviceId = device_id;
-    
-    // Log raw data for debugging
-    if (msg_parts.raw) {
-      console.log(`Raw login hex: ${msg_parts.raw.substring(0, 50)}...`);
-    }
-    
-    // Get analysis from msg_parts
-    const analysis = msg_parts.analysis || {};
-    const brands = analysis.brands || [];
-    const protocols = analysis.protocols || [];
-    
-    console.log(`═══════════════════════════════════════════════════════════`);
-    console.log(`📱 DEVICE LOGIN: ${device_id}`);
-    console.log(`📍 IP: ${connection.remoteAddress}`);
-    console.log(`🏷️  Brands: ${brands.length > 0 ? brands.join(', ') : 'Unknown'}`);
-    console.log(`📊 Protocols: ${protocols.length > 0 ? protocols.join(', ') : 'Unknown'}`);
-    console.log(`📦 Packet Type: ${analysis.packetType || 'Unknown'}`);
-    console.log(`🔢 Protocol: ${analysis.protocolNumber ? '0x' + analysis.protocolNumber : 'Unknown'}`);
-    console.log(`═══════════════════════════════════════════════════════════`);
-    
-    this.login_authorized(true);
-    is_proxy_CRS_device = crsTerminals.includes(device_id);
+ device.on("login_request", function (device_id, msg_parts) {
+  packetsReceived++;
+  deviceId = device_id;
+  
+  // Enhanced debugging
+  console.log(`\n🔍 LOGIN PACKET DETAILS:`);
+  console.log(`   Raw hex: ${msg_parts.raw}`);
+  console.log(`   Protocol ID: 0x${msg_parts.protocol_id}`);
+  console.log(`   Packet length: ${msg_parts.length} bytes`);
+  console.log(`   Data section: ${msg_parts.data}`);
+  
+  // Get analysis from msg_parts
+  const analysis = msg_parts.analysis || {};
+  
+  console.log(`\n═══════════════════════════════════════════════════════════`);
+  console.log(`📱 DEVICE LOGIN: ${device_id}`);
+  console.log(`📍 IP: ${connection.remoteAddress}`);
+  console.log(`🔢 Protocol: ${analysis.protocolNumber ? '0x' + analysis.protocolNumber : 'Unknown'}`);
+  console.log(`📦 Packet Type: ${analysis.packetType || 'Unknown'}`);
+  console.log(`🏷️  Brands: ${analysis.brands && analysis.brands.length > 0 ? analysis.brands.join(', ') : 'Unknown'}`);
+  console.log(`📊 Protocols: ${analysis.protocols && analysis.protocols.length > 0 ? analysis.protocols.join(', ') : 'Unknown'}`);
+  console.log(`🔍 Extracted IMEI: ${analysis.extractedIMEI || 'None'}`);
+  console.log(`═══════════════════════════════════════════════════════════\n`);
+  
+  this.login_authorized(true);
+  is_proxy_CRS_device = crsTerminals.includes(device_id);
 
-    // Create CRS connection if needed
-    if (is_proxy_CRS_device && !crsClient) {
-      console.log(`Creating CRS proxy for device ${device_id}`);
-      crsClient = createCrsConnection();
-    }
+  // Create CRS connection if needed
+  if (is_proxy_CRS_device && !crsClient) {
+    console.log(`Creating CRS proxy for device ${device_id}`);
+    crsClient = createCrsConnection();
+  }
 
-    // Enhanced login data with profiling
-    sendToAPI(API_ENDPOINTS.LOGIN, {
-      device_id: device_id,
-      imei: device_id,
-      protocol_version: "GT06+",
-      ip_address: connection.remoteAddress,
-      timestamp: new Date().toISOString(),
-      crs_proxy: is_proxy_CRS_device,
-      brand_info: brands,
-      protocol_info: protocols,
-      packet_type: analysis.packetType,
-      protocol_number: analysis.protocolNumber,
-      raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : ''
-    }, `Login for ${device_id}`).catch(() => { /* Ignore errors */ });
-  });
+  // Enhanced login data with profiling
+  sendToAPI(API_ENDPOINTS.LOGIN, {
+    device_id: device_id,
+    imei: device_id,
+    protocol_version: "GT06+",
+    ip_address: connection.remoteAddress,
+    timestamp: new Date().toISOString(),
+    crs_proxy: is_proxy_CRS_device,
+    brand_info: analysis.brands || [],
+    protocol_info: analysis.protocols || [],
+    packet_type: analysis.packetType,
+    protocol_number: analysis.protocolNumber,
+    raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : ''
+  }, `Login for ${device_id}`).catch(() => { /* Ignore errors */ });
+});
+
+
 
   device.on("ping", function (data, msg_parts) {
     packetsReceived++;
