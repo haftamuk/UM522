@@ -8,26 +8,19 @@ class DeviceProfiler {
     this.logDir = path.join(process.cwd(), 'logs');
     this.ensureLogDirectory();
     
-    // Device fingerprint database
+    // Enhanced device fingerprint database
     this.deviceFingerprints = {
-      // GT06 Variants
-      '7878': { protocol: 'GT06', brand: 'Concox', family: 'GT06' },
-      '7979': { protocol: 'GT06', brand: 'Unknown', family: 'GT06' },
-      
-      // TK103/303 variants
-      '(0)': { protocol: 'TK103', brand: 'TKStar', family: 'TK10x' },
-      '(1)': { protocol: 'TK103', brand: 'TKStar', family: 'TK10x' },
-      
-      // UM552/UM series
-      'AT+': { protocol: 'UM552', brand: 'Unicore', family: 'UM' },
-      'STX': { protocol: 'UM552', brand: 'Unicore', family: 'UM' },
-      
-      // IMEI prefixes
-      '86872': { brand: 'Teltonika', country: 'China' },
-      '35865': { brand: 'Queclink', country: 'China' },
-      '86494': { brand: 'Suntech', country: 'China' },
-      '86108': { brand: 'Concox', country: 'China' },
-      '86219': { brand: 'Meitrack', country: 'China' }
+      // IMEI prefixes by brand
+      '86872': { brand: 'Teltonika', family: 'Teltonika' },
+      '35865': { brand: 'Queclink', family: 'Queclink' },
+      '86494': { brand: 'Suntech', family: 'Suntech' },
+      '86108': { brand: 'Concox', family: 'GT06' },
+      '86219': { brand: 'Meitrack', family: 'Meitrack' },
+      '086872': { brand: 'Teltonika', family: 'Teltonika' },
+      '035865': { brand: 'Queclink', family: 'Queclink' },
+      '086494': { brand: 'Suntech', family: 'Suntech' },
+      '086108': { brand: 'Concox', family: 'GT06' },
+      '086219': { brand: 'Meitrack', family: 'Meitrack' },
     };
   }
 
@@ -35,12 +28,6 @@ class DeviceProfiler {
     if (!fs.existsSync(this.logDir)) {
       fs.mkdirSync(this.logDir, { recursive: true });
     }
-  }
-
-  generateDeviceFingerprint(data) {
-    const hash = crypto.createHash('md5');
-    hash.update(data);
-    return hash.digest('hex');
   }
 
   analyzeRawData(rawData, deviceId = null) {
@@ -51,47 +38,114 @@ class DeviceProfiler {
       hexPreview: rawData.slice(0, 100).toString('hex'),
       protocols: [],
       brands: [],
-      features: {}
+      features: {},
+      isGT06: false,
+      protocolNumber: null
     };
 
-    // Protocol detection
     const hexString = rawData.toString('hex');
     const asciiString = rawData.toString('ascii', 0, Math.min(50, rawData.length));
 
-    // Check for GT06 protocol
+    // Enhanced GT06 detection
     if (hexString.startsWith('7878') || hexString.startsWith('7979')) {
       analysis.protocols.push('GT06');
-      analysis.protocolVersion = hexString.substring(6, 8);
+      analysis.isGT06 = true;
+      
+      try {
+        // Extract protocol number
+        if (hexString.length >= 8) {
+          analysis.protocolNumber = hexString.substring(6, 8);
+          analysis.protocolVersion = `0x${analysis.protocolNumber}`;
+          
+          // Map protocol numbers to types
+          const protocolMap = {
+            '01': 'Login',
+            '10': 'GPS Data',
+            '11': 'GPS Data',
+            '12': 'Location Data',
+            '13': 'Heartbeat/Status',
+            '16': 'Alarm',
+            '17': 'LBS Location',
+            '1a': 'Address Query',
+            '22': 'GPS + Address',
+            '26': 'Alarm + Address'
+          };
+          
+          if (protocolMap[analysis.protocolNumber]) {
+            analysis.packetType = protocolMap[analysis.protocolNumber];
+          }
+        }
+        
+        // Try to extract IMEI from login packet (protocol 01)
+        if (analysis.protocolNumber === '01' && hexString.length >= 24) {
+          // Login packet: 7878 0D 01 IMEI(8 bytes) SERIAL CRC STOP
+          const imeiHex = hexString.substring(8, 24); // 8 bytes = 16 hex chars
+          let imei = '';
+          for (let i = 0; i < imeiHex.length; i += 2) {
+            const byte = imeiHex.substring(i, i + 2);
+            imei += parseInt(byte, 16).toString().padStart(2, '0');
+          }
+          analysis.extractedIMEI = imei;
+          
+          if (!deviceId && imei) {
+            deviceId = imei;
+            analysis.deviceId = imei;
+          }
+        }
+      } catch (error) {
+        console.error('Error analyzing GT06 data:', error.message);
+      }
     }
 
     // Check for TK103 protocol
-    if (asciiString.includes('(') && asciiString.includes(')')) {
+    if (asciiString.includes('imei:') || asciiString.includes('(') && asciiString.includes(')')) {
       analysis.protocols.push('TK103');
-      if (asciiString.includes('imei:')) analysis.brands.push('TKStar');
+      analysis.protocols.push('TKStar');
     }
 
     // Check for UM552 protocol
-    if (asciiString.startsWith('AT+') || asciiString.includes('STX')) {
+    if (asciiString.includes('AT+') || asciiString.includes('UM')) {
       analysis.protocols.push('UM552');
-      analysis.brands.push('Unicore');
+      analysis.protocols.push('Unicore');
     }
 
     // IMEI-based brand detection
     if (deviceId) {
+      const cleanDeviceId = deviceId.toString().replace(/\s/g, '');
+      
       for (const [prefix, info] of Object.entries(this.deviceFingerprints)) {
-        if (deviceId.startsWith(prefix)) {
+        if (cleanDeviceId.startsWith(prefix)) {
           analysis.brands.push(info.brand);
+          analysis.family = info.family;
           analysis.imeiPrefix = prefix;
           Object.assign(analysis.features, info);
           break;
         }
       }
+      
+      // If no brand detected but it's GT06, assume Concox
+      if (analysis.isGT06 && analysis.brands.length === 0) {
+        analysis.brands.push('Concox');
+        analysis.brands.push('GT06 Family');
+        analysis.family = 'GT06';
+      }
+      
+      // Check for specific device patterns in your CRS terminals
+      if (cleanDeviceId.startsWith('086872') || cleanDeviceId.startsWith('035865') || cleanDeviceId.startsWith('086494')) {
+        analysis.isCRSDevice = true;
+      }
     }
+
+    // Remove duplicates
+    analysis.protocols = [...new Set(analysis.protocols)];
+    analysis.brands = [...new Set(analysis.brands)];
 
     return analysis;
   }
 
   updateDeviceProfile(deviceId, analysis, connectionInfo = {}) {
+    if (!deviceId) return null;
+    
     if (!this.profiles.has(deviceId)) {
       this.profiles.set(deviceId, {
         firstSeen: new Date().toISOString(),
@@ -118,11 +172,17 @@ class DeviceProfiler {
     }
     
     if (connectionInfo.ip) {
-      profile.connections.push({
-        ip: connectionInfo.ip,
-        port: connectionInfo.port,
-        timestamp: new Date().toISOString()
-      });
+      const existingConnection = profile.connections.find(conn => 
+        conn.ip === connectionInfo.ip && conn.port === connectionInfo.port
+      );
+      
+      if (!existingConnection) {
+        profile.connections.push({
+          ip: connectionInfo.ip,
+          port: connectionInfo.port,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
 
     // Log to file
@@ -133,6 +193,7 @@ class DeviceProfiler {
 
   logProfileToFile(deviceId, profile, latestAnalysis) {
     const profileFile = path.join(this.logDir, 'device_profiles.json');
+    
     const logEntry = {
       timestamp: new Date().toISOString(),
       deviceId,
@@ -140,27 +201,34 @@ class DeviceProfiler {
         firstSeen: profile.firstSeen,
         lastSeen: profile.lastSeen,
         totalConnections: profile.connections.length,
+        uniqueIPs: [...new Set(profile.connections.map(c => c.ip))].length,
         suspectedBrands: Array.from(profile.suspectedBrands),
         protocols: Array.from(profile.detectedProtocols),
-        uniqueFeatures: Array.from(profile.features)
+        totalPackets: profile.analyses.length
       },
-      latestAnalysis
+      latestAnalysis: {
+        timestamp: latestAnalysis.timestamp,
+        protocols: latestAnalysis.protocols,
+        brands: latestAnalysis.brands,
+        packetType: latestAnalysis.packetType,
+        protocolNumber: latestAnalysis.protocolNumber
+      }
     };
 
-    // Read existing profiles
     let allProfiles = {};
     try {
       if (fs.existsSync(profileFile)) {
-        allProfiles = JSON.parse(fs.readFileSync(profileFile, 'utf8'));
+        const content = fs.readFileSync(profileFile, 'utf8');
+        if (content.trim()) {
+          allProfiles = JSON.parse(content);
+        }
       }
     } catch (e) {
       console.error('Error reading profiles file:', e.message);
     }
 
-    // Update this device's profile
     allProfiles[deviceId] = logEntry;
 
-    // Write back
     try {
       fs.writeFileSync(profileFile, JSON.stringify(allProfiles, null, 2));
     } catch (e) {
@@ -173,7 +241,6 @@ class DeviceProfiler {
     const dateStr = timestamp.toISOString().split('T')[0];
     const hourStr = timestamp.getHours().toString().padStart(2, '0');
     
-    // Create directory structure
     const rawDir = path.join(this.logDir, 'raw', dateStr);
     if (!fs.existsSync(rawDir)) {
       fs.mkdirSync(rawDir, { recursive: true });
@@ -198,11 +265,11 @@ class DeviceProfiler {
     
     try {
       fs.appendFileSync(logFile, logLine);
+      return logEntry;
     } catch (e) {
       console.error('Error writing raw log:', e.message);
+      return null;
     }
-
-    return logEntry;
   }
 
   getDeviceSummary() {
@@ -210,7 +277,8 @@ class DeviceProfiler {
       totalDevices: this.profiles.size,
       devicesByProtocol: {},
       devicesByBrand: {},
-      recentlyActive: []
+      recentlyActive: [],
+      crsDevices: []
     };
 
     const now = new Date();
@@ -234,7 +302,17 @@ class DeviceProfiler {
           deviceId,
           lastSeen: profile.lastSeen,
           protocols: Array.from(profile.detectedProtocols),
-          brands: Array.from(profile.suspectedBrands)
+          brands: Array.from(profile.suspectedBrands),
+          totalPackets: profile.analyses.length
+        });
+      }
+
+      // Check if it's a CRS device
+      if (deviceId.startsWith('086872') || deviceId.startsWith('035865') || deviceId.startsWith('086494')) {
+        summary.crsDevices.push({
+          deviceId,
+          lastSeen: profile.lastSeen,
+          totalPackets: profile.analyses.length
         });
       }
     }

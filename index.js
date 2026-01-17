@@ -211,7 +211,6 @@ const server = gps.server(options, function (device, connection) {
   connection.on('close', () => {
     console.log(`Connection closed for ${deviceId || 'unknown device'} (Duration: ${Math.round((Date.now() - connectionStartTime) / 1000)}s, Packets: ${packetsReceived})`);
     
-    // Clean up CRS connection
     if (crsClient) {
       try {
         crsClient.destroy();
@@ -229,11 +228,24 @@ const server = gps.server(options, function (device, connection) {
   device.on("login_request", function (device_id, msg_parts) {
     packetsReceived++;
     deviceId = device_id;
+    
+    // Log raw data for debugging
+    if (msg_parts.raw) {
+      console.log(`Raw login hex: ${msg_parts.raw.substring(0, 50)}...`);
+    }
+    
+    // Get analysis from msg_parts
+    const analysis = msg_parts.analysis || {};
+    const brands = analysis.brands || [];
+    const protocols = analysis.protocols || [];
+    
     console.log(`═══════════════════════════════════════════════════════════`);
     console.log(`📱 DEVICE LOGIN: ${device_id}`);
     console.log(`📍 IP: ${connection.remoteAddress}`);
-    console.log(`🏷️  Brands: ${msg_parts.analysis?.brands?.join(', ') || 'Unknown'}`);
-    console.log(`📊 Protocols: ${msg_parts.analysis?.protocols?.join(', ') || 'Unknown'}`);
+    console.log(`🏷️  Brands: ${brands.length > 0 ? brands.join(', ') : 'Unknown'}`);
+    console.log(`📊 Protocols: ${protocols.length > 0 ? protocols.join(', ') : 'Unknown'}`);
+    console.log(`📦 Packet Type: ${analysis.packetType || 'Unknown'}`);
+    console.log(`🔢 Protocol: ${analysis.protocolNumber ? '0x' + analysis.protocolNumber : 'Unknown'}`);
     console.log(`═══════════════════════════════════════════════════════════`);
     
     this.login_authorized(true);
@@ -245,6 +257,7 @@ const server = gps.server(options, function (device, connection) {
       crsClient = createCrsConnection();
     }
 
+    // Enhanced login data with profiling
     sendToAPI(API_ENDPOINTS.LOGIN, {
       device_id: device_id,
       imei: device_id,
@@ -252,8 +265,11 @@ const server = gps.server(options, function (device, connection) {
       ip_address: connection.remoteAddress,
       timestamp: new Date().toISOString(),
       crs_proxy: is_proxy_CRS_device,
-      brand_info: msg_parts.analysis?.brands,
-      protocol_info: msg_parts.analysis?.protocols
+      brand_info: brands,
+      protocol_info: protocols,
+      packet_type: analysis.packetType,
+      protocol_number: analysis.protocolNumber,
+      raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : ''
     }, `Login for ${device_id}`).catch(() => { /* Ignore errors */ });
   });
 
