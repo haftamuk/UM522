@@ -9,7 +9,7 @@ const gpsTracking = require("gps-tracking");
 const gps = gpsTracking;
 
 // Import profiler and parser
-const DeviceProfiler = require('./profiler');
+const EnhancedProfiler = require('./enhanced-profiler');
 const AlarmParser = require('./alarm-parser');
 
 // Import enhanced adapter
@@ -20,7 +20,7 @@ if (!gps.server.availableAdapters) {
 gps.server.availableAdapters.GT06_PLUS = enhancedAdapter;
 
 // Initialize profiler and parser
-const profiler = new DeviceProfiler();
+const enhancedProfiler = new EnhancedProfiler();
 const alarmParser = new AlarmParser();
 
 // API endpoints
@@ -224,6 +224,7 @@ const server = gps.server(options, function (device, connection) {
     console.log(`Connection timeout for ${deviceId || 'unknown device'}`);
   });
 
+// Then in the device.on("login_request") event handler, update:
 device.on("login_request", function (device_id, msg_parts) {
   packetsReceived++;
   deviceId = device_id;
@@ -234,15 +235,36 @@ device.on("login_request", function (device_id, msg_parts) {
   console.log(`   Packet length: ${msg_parts.length} bytes`);
   console.log(`   Data section: ${msg_parts.data}`);
   
-  // Get analysis - FIXED: It should be in msg_parts.analysis
-  const analysis = msg_parts.analysis || {};
+  // ENHANCED: Get analysis from multiple sources
+  let analysis = {};
+  
+  // 1. First try to get from msg_parts.analysis (from adapter)
+  if (msg_parts.analysis && Object.keys(msg_parts.analysis).length > 0) {
+    analysis = msg_parts.analysis;
+    console.log('✓ Using analysis from adapter');
+  } 
+  // 2. If not available, use enhanced profiler
+  else if (msg_parts.raw) {
+    analysis = enhancedProfiler.analyzePacket(msg_parts.raw, device_id);
+    console.log('✓ Using analysis from enhanced profiler');
+  }
+  // 3. Fallback to simple analysis
+  else {
+    analysis = {
+      protocolNumber: msg_parts.protocol_id || 'unknown',
+      packetType: 'Login',
+      brands: ['GT06 Family'],
+      protocols: ['GT06']
+    };
+    console.log('⚠ Using fallback analysis');
+  }
   
   console.log(`ANALYSIS OBJECT:`, JSON.stringify(analysis, null, 2));
   
   console.log(`\n═══════════════════════════════════════════════════════════`);
   console.log(`📱 DEVICE LOGIN: ${device_id}`);
   console.log(`📍 IP: ${connection.remoteAddress}`);
-  console.log(`🔢 Protocol: ${analysis.protocolNumber ? '0x' + analysis.protocolNumber : 'Unknown'}`);
+  console.log(`🔢 Protocol: 0x${analysis.protocolNumber || msg_parts.protocol_id || 'Unknown'}`);
   console.log(`📦 Packet Type: ${analysis.packetType || 'Unknown'}`);
   console.log(`🏷️  Brands: ${analysis.brands && analysis.brands.length > 0 ? analysis.brands.join(', ') : 'Unknown'}`);
   console.log(`📊 Protocols: ${analysis.protocols && analysis.protocols.length > 0 ? analysis.protocols.join(', ') : 'Unknown'}`);
@@ -269,9 +291,11 @@ device.on("login_request", function (device_id, msg_parts) {
     protocol_info: analysis.protocols || [],
     packet_type: analysis.packetType,
     protocol_number: analysis.protocolNumber,
-    raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : ''
+    raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : '',
+    analysis: analysis // Include full analysis
   }, `Login for ${device_id}`).catch(() => { /* Ignore errors */ });
 });
+
 
   device.on("ping", function (data, msg_parts) {
     packetsReceived++;
@@ -419,7 +443,7 @@ function gracefulShutdown(signal) {
   
   // Get device statistics
   try {
-    const deviceStats = profiler.getDeviceSummary();
+    const deviceStats = enhancedProfiler.getDeviceSummary();
     const alarmStats = alarmParser.getAlarmStatistics();
     
     console.log('\n📊 FINAL STATISTICS:');
@@ -487,7 +511,7 @@ console.log(`Queue settings: Max ${requestQueue.maxConcurrent} concurrent reques
 // Periodic stats logging
 setInterval(() => {
   const stats = requestQueue.getStats();
-  const deviceStats = profiler.getDeviceSummary();
+  const deviceStats = enhancedProfiler.getDeviceSummary();
   const alarmStats = alarmParser.getAlarmStatistics();
   
   console.log(`\n📊 SERVER STATISTICS:`);
