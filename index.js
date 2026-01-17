@@ -224,7 +224,7 @@ const server = gps.server(options, function (device, connection) {
     console.log(`Connection timeout for ${deviceId || 'unknown device'}`);
   });
 
- device.on("login_request", function (device_id, msg_parts) {
+device.on("login_request", function (device_id, msg_parts) {
   packetsReceived++;
   deviceId = device_id;
   
@@ -234,8 +234,10 @@ const server = gps.server(options, function (device, connection) {
   console.log(`   Packet length: ${msg_parts.length} bytes`);
   console.log(`   Data section: ${msg_parts.data}`);
   
-  // Get analysis from msg_parts
+  // Get analysis - FIXED: It should be in msg_parts.analysis
   const analysis = msg_parts.analysis || {};
+  
+  console.log(`ANALYSIS OBJECT:`, JSON.stringify(analysis, null, 2));
   
   console.log(`\n═══════════════════════════════════════════════════════════`);
   console.log(`📱 DEVICE LOGIN: ${device_id}`);
@@ -270,8 +272,6 @@ const server = gps.server(options, function (device, connection) {
     raw_preview: msg_parts.raw ? msg_parts.raw.substring(0, 50) : ''
   }, `Login for ${device_id}`).catch(() => { /* Ignore errors */ });
 });
-
-
 
   device.on("ping", function (data, msg_parts) {
     packetsReceived++;
