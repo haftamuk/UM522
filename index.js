@@ -407,6 +407,8 @@ process.on('unhandledRejection', function (reason, promise) {
   console.error('Reason:', reason);
 });
 
+// ... previous code ...
+
 // Graceful shutdown
 function gracefulShutdown(signal) {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
@@ -416,28 +418,59 @@ function gracefulShutdown(signal) {
   console.log('Request Queue Stats:', stats);
   
   // Get device statistics
-  const adapter = enhancedAdapter.adapter;
-  if (adapter && adapter.prototype.getStatistics) {
+  try {
     const deviceStats = profiler.getDeviceSummary();
     const alarmStats = alarmParser.getAlarmStatistics();
+    
     console.log('\n📊 FINAL STATISTICS:');
     console.log(`   Total Devices: ${deviceStats.totalDevices}`);
+    console.log(`   Recently Active: ${deviceStats.recentlyActive.length}`);
     console.log(`   Total Alarms: ${alarmStats.totalAlarms || 0}`);
-    console.log(`   By Protocol: ${JSON.stringify(alarmStats.byProtocol)}`);
+    console.log(`   By Protocol: ${JSON.stringify(alarmStats.byProtocol || {})}`);
+  } catch (error) {
+    console.error('Error getting statistics:', error.message);
   }
   
-  // Close server
-  server.close(() => {
-    console.log('GPS Server closed');
+  // Check if server has a close method
+  if (server && typeof server.close === 'function') {
+    console.log('Closing GPS server...');
+    server.close(() => {
+      console.log('GPS Server closed');
+      process.exit(0);
+    });
+    
+    // Force exit after 10 seconds
+    setTimeout(() => {
+      console.log('Forcing shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } else if (server && typeof server.server !== 'undefined') {
+    // Try accessing the underlying net server
+    console.log('Closing underlying net server...');
+    if (server.server && typeof server.server.close === 'function') {
+      server.server.close(() => {
+        console.log('GPS Server closed');
+        process.exit(0);
+      });
+      
+      setTimeout(() => {
+        console.log('Forcing shutdown after timeout');
+        process.exit(1);
+      }, 10000);
+    } else {
+      console.log('Cannot find server close method, exiting...');
+      process.exit(0);
+    }
+  } else {
+    console.log('Server instance not found, exiting...');
     process.exit(0);
-  });
-  
-  // Force exit after 10 seconds
-  setTimeout(() => {
-    console.log('Forcing shutdown after timeout');
-    process.exit(1);
-  }, 10000);
+  }
 }
+
+// Alternative: Check what type of object server is
+console.log('Server type:', typeof server);
+console.log('Server keys:', Object.keys(server || {}));
+console.log('Server.constructor.name:', server?.constructor?.name);
 
 // Register shutdown handlers
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
