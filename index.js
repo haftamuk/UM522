@@ -228,7 +228,6 @@ const server = gps.server(options, function (device, connection) {
   packetsReceived++;
   deviceId = device_id;
   
-  // Enhanced debugging
   console.log(`\n🔍 LOGIN PACKET DETAILS:`);
   console.log(`   Raw hex: ${msg_parts.raw}`);
   console.log(`   Protocol ID: 0x${msg_parts.protocol_id}`);
@@ -245,7 +244,6 @@ const server = gps.server(options, function (device, connection) {
   console.log(`📦 Packet Type: ${analysis.packetType || 'Unknown'}`);
   console.log(`🏷️  Brands: ${analysis.brands && analysis.brands.length > 0 ? analysis.brands.join(', ') : 'Unknown'}`);
   console.log(`📊 Protocols: ${analysis.protocols && analysis.protocols.length > 0 ? analysis.protocols.join(', ') : 'Unknown'}`);
-  console.log(`🔍 Extracted IMEI: ${analysis.extractedIMEI || 'None'}`);
   console.log(`═══════════════════════════════════════════════════════════\n`);
   
   this.login_authorized(true);
